@@ -1,0 +1,37 @@
+.switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.button,
+.active {
+  font: inherit;
+  font-weight: 500;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.button {
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+}
+.button:hover {
+  border-color: var(--muted);
+}
+
+.active {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.button:disabled,
+.active:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

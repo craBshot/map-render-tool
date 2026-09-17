@@ -1,6 +1,10 @@
 import { strings } from '../../i18n'
+import { AreaListPanel } from './AreaListPanel'
+import { AreaStylePanel } from './AreaStylePanel'
+import { AreaTypeSettingsPanel } from './AreaTypeSettingsPanel'
 import { CameraPanel } from './CameraPanel'
 import { ExportPanel } from './ExportPanel'
+import { InteractionModePanel } from './InteractionModePanel'
 import { MarkerPanel } from './MarkerPanel'
 import { SearchPanel } from './SearchPanel'
 import { StylePanel } from './StylePanel'
@@ -14,8 +18,12 @@ export function Sidebar() {
       <SearchPanel />
       <CameraPanel />
       <StylePanel />
+      <InteractionModePanel />
       <MarkerPanel />
+      <AreaListPanel />
+      <AreaStylePanel />
       <ExportPanel />
+      <AreaTypeSettingsPanel />
     </aside>
   )
 }

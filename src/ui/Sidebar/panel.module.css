@@ -152,3 +152,53 @@
   composes: msg;
   color: var(--warn);
 }
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  margin: 0 0 10px;
+  background: #fff;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.iconButton {
+  font: inherit;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 7px;
+  cursor: pointer;
+  line-height: 1;
+}
+.iconButton:hover {
+  border-color: var(--muted);
+  color: var(--ink);
+}
+.iconButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.radioGrid {
+  display: grid;
+  gap: 4px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+.radioGrid label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
