@@ -12,6 +12,16 @@ import { Crosshair } from './Crosshair'
 import { Readout } from './Readout'
 import styles from './MapStage.module.css'
 
+declare global {
+  interface Window {
+    // Set by Playwright via addInitScript() before navigation — gives e2e
+    // tests a way to inspect the live MapController without adding any
+    // test-only UI. Never set in a real deployment.
+    __E2E__?: boolean
+    __mapController?: MapController
+  }
+}
+
 export function MapStage() {
   const containerRef = useRef<HTMLDivElement>(null)
   const controllerRef = useRef<MapController | null>(null)
@@ -43,6 +53,7 @@ export function MapStage() {
     })
     controllerRef.current = controller
     useEditorStore.getState().setController(controller)
+    if (window.__E2E__) window.__mapController = controller
     controller.applyCameraFrame(camAt(initialProject.camera, 0))
 
     const updateReadout = () => {
@@ -72,6 +83,7 @@ export function MapStage() {
       controller.destroy()
       controllerRef.current = null
       useEditorStore.getState().setController(null)
+      if (window.__mapController === controller) window.__mapController = undefined
     }
   }, [])
 
