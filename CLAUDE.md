@@ -23,6 +23,7 @@ Browser tool that renders animated map flights (zoom from country to region, tar
 - **MapLibre GL JS 4.7.1** (intentionally pinned). v5 changes e.g. `preserveDrawingBuffer` → `canvasContextAttributes`. Upgrade only as a dedicated task.
 - **Map data:** OpenFreeMap styles (positron, liberty, bright, dark, fiord), no key.
 - **Place search:** Nominatim. Respect the usage policy: max 1 request/s, no search-as-you-type.
+- **Area lookup:** Overpass API (`https://overpass-api.de/api/interpreter`), a shared public instance — fair use only: on-demand single queries triggered by an explicit pick-click, never batched/background/polling. Two-step: a cheap `is_in()`/tags-only query lists candidates at a point; geometry (`out geom;`) is fetched only for the element the user actually picks.
 - **Export:** MP4 via WebCodecs (H.264) + `mp4-muxer`; image sequence via JSZip.
 - **Reference:** `legacy/karten-zoom.html` is the working single-file version. Match its behavior when porting.
 
@@ -63,7 +64,7 @@ Browser tool that renders animated map flights (zoom from country to region, tar
 
 1. **Multiple markers:** list instead of dropdown (color swatch, name, visibility, delete). Per marker: position, name as optional map label, appear time. "Apply style to all" copies only color, size and pulse.
 2. **Save/load projects** as JSON file (server-side storage optional later).
-3. **Highlight areas:** outline via Nominatim (`polygon_geojson`), shown as fill or spotlight (surroundings dimmed). Simple polygon tool for areas without an official boundary.
+3. **Highlight areas:** right-click mode toggle (marker vs. area) queries Overpass `is_in()` at the clicked point, showing every containing area (administrative levels *and* non-administrative ones like nature reserves/national parks — Nominatim's reverse geocoding can't do this, it only walks the administrative parent chain). Picked areas land in an ordered list (order = stacking order); each references a named style (fill/outline/appear-timing) from a small separate style palette. Which candidate types are even offered is user-configurable (a settings panel), not hardcoded. A simple polygon tool for areas without an official boundary is still open.
 4. **Routes:** route via public OSRM demo server (low usage, ~10 requests per editing day), line drawn progressively frame by frame in the export.
 
 Markers, areas and routes should eventually live in **one shared object list** with a unified timing model.
