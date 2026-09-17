@@ -1,4 +1,4 @@
-import { PROJECT_VERSION, type ProjectFile } from './types'
+import { createDefaultAreaStyles, PROJECT_VERSION, type ProjectFile } from './types'
 
 type Migration = (data: unknown) => unknown
 
@@ -8,7 +8,15 @@ type Migration = (data: unknown) => unknown
  * reaches PROJECT_VERSION. Add a new entry here whenever the data format
  * changes so old project files keep loading.
  */
-const migrations: Record<number, Migration> = {}
+const migrations: Record<number, Migration> = {
+  // v1 -> v2: added areas/areaStyles (region highlighting).
+  1: (data) => ({
+    ...(data as object),
+    version: 2,
+    areas: [],
+    areaStyles: createDefaultAreaStyles(),
+  }),
+}
 
 export class UnsupportedProjectVersionError extends Error {
   constructor(version: unknown) {

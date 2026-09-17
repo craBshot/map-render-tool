@@ -1,4 +1,4 @@
-export const PROJECT_VERSION = 1
+export const PROJECT_VERSION = 2
 
 /**
  * crypto.randomUUID() requires a secure context, but this app must also
@@ -66,6 +66,38 @@ export interface MarkerObject {
   visible: boolean
 }
 
+export interface AreaStyle {
+  id: string
+  name: string
+  fill: { enabled: boolean; color: string; opacity: number }
+  outline: { enabled: boolean; color: string; widthPx: number; dashed: boolean }
+  appear: {
+    mode: 'start' | 'zoomStart' | 'zoomEnd' | 'custom'
+    atSec?: number
+    fadeDurationSec: number
+    // Reserved for a future pulse effect (MapLibre has no built-in polygon
+    // pulse primitive like the marker's circle halo) — not implemented yet.
+    pulse?: { enabled: boolean; periodSec: number; strength: number }
+  }
+}
+
+export interface AreaObject {
+  id: string
+  /** From the picked Overpass tag, editable afterward. */
+  name: string
+  /** null = "none" — in the list but not highlighted. */
+  styleId: string | null
+  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon
+  /** Provenance only — never re-fetched from this. */
+  source: { osmType: 'way' | 'relation'; osmId: number }
+  visible: boolean
+}
+
+export function resolveAreaStyle(styleId: string | null, styles: AreaStyle[]): AreaStyle | null {
+  if (styleId === null) return null
+  return styles.find((s) => s.id === styleId) ?? null
+}
+
 export interface ExportSettings {
   resolution: { preset: ResolutionPreset; width: number; height: number }
   fps: 24 | 25 | 30 | 50 | 60
@@ -86,6 +118,9 @@ export interface ProjectFile {
   // A single-element list already, so the later move to a shared
   // markers/areas/routes object list (planned feature 1+) is additive.
   markers: MarkerObject[]
+  // Order is stacking order: earlier entries render on top.
+  areas: AreaObject[]
+  areaStyles: AreaStyle[]
   export: ExportSettings
 }
 
@@ -98,6 +133,44 @@ export function createDefaultMarker(lng: number, lat: number): MarkerObject {
     sizePx: 9,
     pulse: { enabled: true, periodSec: 1.6, scale: 3.2, strength: 0.45 },
     appear: { mode: 'zoomEnd', popDurationSec: 0.4 },
+    visible: true,
+  }
+}
+
+export function createDefaultAreaStyle(name: string, overrides: Partial<Omit<AreaStyle, 'id' | 'name'>> = {}): AreaStyle {
+  return {
+    id: generateId(),
+    name,
+    fill: { enabled: true, color: '#2f6bff', opacity: 0.25 },
+    outline: { enabled: true, color: '#2f6bff', widthPx: 2, dashed: false },
+    appear: { mode: 'start', fadeDurationSec: 0.6 },
+    ...overrides,
+  }
+}
+
+/** The starter style palette seeded into new projects and migrated-up old ones. */
+export function createDefaultAreaStyles(): AreaStyle[] {
+  return [
+    createDefaultAreaStyle('Transparent gefüllt'),
+    createDefaultAreaStyle('Gestrichelte Umrandung', {
+      fill: { enabled: false, color: '#2f6bff', opacity: 0.25 },
+      outline: { enabled: true, color: '#2f6bff', widthPx: 2, dashed: true },
+    }),
+  ]
+}
+
+export function createDefaultArea(
+  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon,
+  name: string,
+  source: AreaObject['source'],
+  styleId: string | null,
+): AreaObject {
+  return {
+    id: generateId(),
+    name,
+    styleId,
+    geometry,
+    source,
     visible: true,
   }
 }
@@ -117,6 +190,8 @@ export function createDefaultProject(): ProjectFile {
       hideMinorLabels: true,
     },
     markers: [],
+    areas: [],
+    areaStyles: createDefaultAreaStyles(),
     export: {
       resolution: { preset: '1920x1080', width: 1920, height: 1080 },
       fps: 30,
