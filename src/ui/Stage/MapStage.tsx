@@ -1,6 +1,6 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { MapMouseEvent } from 'maplibre-gl'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { camAt } from '../../map/camera'
 import { MapController } from '../../map/MapController'
 import { markerStateAt } from '../../map/markerAnimation'
@@ -23,6 +23,7 @@ declare global {
 }
 
 export function MapStage() {
+  const stageRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const controllerRef = useRef<MapController | null>(null)
   const styleIdRef = useRef<string | null>(null)
@@ -32,10 +33,20 @@ export function MapStage() {
 
   const [readout, setReadout] = useState<{ lng: number; lat: number; zr: number } | null>(null)
 
+  function fitStageToCurrentResolution() {
+    const controller = controllerRef.current
+    const stageEl = stageRef.current
+    if (!controller || !stageEl) return
+    const { width, height } = useProjectStore.getState().project.export.resolution
+    controller.fitStage(width, height, stageEl.getBoundingClientRect())
+  }
+
   // Create the map once. Everything reactive after this reads the latest
   // store state imperatively (via getState()) instead of closing over props,
-  // since map event handlers are not re-subscribed on every render.
-  useEffect(() => {
+  // since map event handlers are not re-subscribed on every render. Runs as
+  // a layout effect together with the initial fitStage() below so the
+  // container is already sized correctly before the browser paints.
+  useLayoutEffect(() => {
     if (!containerRef.current) return
     const initialProject = useProjectStore.getState().project
     styleIdRef.current = initialProject.style.id
@@ -55,6 +66,7 @@ export function MapStage() {
     useEditorStore.getState().setController(controller)
     if (window.__E2E__) window.__mapController = controller
     controller.applyCameraFrame(camAt(initialProject.camera, 0))
+    fitStageToCurrentResolution()
 
     const updateReadout = () => {
       const c = controller.map.getCenter()
@@ -87,6 +99,22 @@ export function MapStage() {
     }
   }, [])
 
+  // Re-letterbox the stage whenever the target export resolution changes,
+  // so the framing preview always matches what export will actually crop —
+  // and whenever the browser window resizes the available stage area.
+  useEffect(() => {
+    fitStageToCurrentResolution()
+  }, [project.export.resolution.width, project.export.resolution.height])
+
+  useEffect(() => {
+    function handleResize() {
+      if (useEditorStore.getState().locked) return // don't fight the export loop's own pixel-ratio sizing
+      fitStageToCurrentResolution()
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   // Style id / label settings.
   useEffect(() => {
     const controller = controllerRef.current
@@ -110,7 +138,7 @@ export function MapStage() {
   }, [project.markers, project.camera.timing])
 
   return (
-    <div className={styles.stage}>
+    <div ref={stageRef} className={styles.stage}>
       <div ref={containerRef} className={styles.map} data-locked={locked || undefined}>
         <Crosshair />
         {readout && <Readout lng={readout.lng} lat={readout.lat} zr={readout.zr} />}
