@@ -9,3 +9,8 @@ export function easeOutBack(x: number): number {
   const c3 = c1 + 1
   return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2)
 }
+
+/** Plain decelerating ramp (no overshoot), used for the area fade-in. */
+export function easeOutQuad(t: number): number {
+  return 1 - (1 - t) * (1 - t)
+}
