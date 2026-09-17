@@ -17,7 +17,7 @@ interface EditorStore {
 export const useEditorStore = create<EditorStore>((set) => ({
   playbackTimeSec: 0,
   setPlaybackTimeSec: (sec) => set({ playbackTimeSec: sec }),
-  crosshairVisible: false,
+  crosshairVisible: true,
   setCrosshairVisible: (visible) => set({ crosshairVisible: visible }),
   locked: false,
   setLocked: (locked) => set({ locked }),

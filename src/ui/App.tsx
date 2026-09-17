@@ -1,7 +1,10 @@
+import { MapStage } from './Stage/MapStage'
+import styles from './App.module.css'
+
 export function App() {
   return (
-    <div>
-      <h1>Map Render Tool</h1>
+    <div className={styles.app}>
+      <MapStage />
     </div>
   )
 }

@@ -1,5 +1,13 @@
 export const PROJECT_VERSION = 1
 
+/**
+ * crypto.randomUUID() requires a secure context, but this app must also
+ * work over plain HTTP (CLAUDE.md) — so ids are generated without it.
+ */
+export function generateId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 export type StyleId = 'positron' | 'liberty' | 'bright' | 'dark' | 'fiord'
 
 export type ExportFormat = 'mp4' | 'jpeg' | 'png'
@@ -72,6 +80,19 @@ export interface ProjectFile {
   // markers/areas/routes object list (planned feature 1+) is additive.
   markers: MarkerObject[]
   export: ExportSettings
+}
+
+export function createDefaultMarker(lng: number, lat: number): MarkerObject {
+  return {
+    id: generateId(),
+    lng,
+    lat,
+    color: '#2f6bff',
+    sizePx: 9,
+    pulse: { enabled: true, periodSec: 1.6, scale: 3.2, strength: 0.45 },
+    appear: { mode: 'zoomEnd', popDurationSec: 0.6 },
+    visible: true,
+  }
 }
 
 export function createDefaultProject(): ProjectFile {

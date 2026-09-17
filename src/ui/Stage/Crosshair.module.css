@@ -1,0 +1,43 @@
+.crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.crosshair span {
+  position: absolute;
+  background: #1d2b33;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85);
+}
+.h {
+  height: 1px;
+  width: 14px;
+  top: 0;
+}
+.l {
+  left: -20px;
+}
+.r {
+  left: 6px;
+}
+.v {
+  width: 1px;
+  height: 14px;
+  left: 0;
+}
+.t {
+  top: -20px;
+}
+.b {
+  top: 6px;
+}
+.center {
+  width: 3px;
+  height: 3px;
+  left: -1px;
+  top: -1px;
+  border-radius: 50%;
+}

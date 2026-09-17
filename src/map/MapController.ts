@@ -45,6 +45,7 @@ export class MapController {
   readonly map: maplibregl.Map
   private originalLayers: Record<string, OriginalLayerInfo> = {}
   private labelSettings: StyleState
+  private styleReady = false
 
   constructor(options: MapControllerOptions) {
     this.labelSettings = options.style
@@ -69,6 +70,7 @@ export class MapController {
     this.map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 
     this.map.on('style.load', () => {
+      this.styleReady = true
       this.originalLayers = captureOriginalLayers(this.map)
       applyLabelSettings(this.map, this.originalLayers, this.labelSettings)
       options.onStyleReady?.()
@@ -77,6 +79,7 @@ export class MapController {
 
   /** Forces a full style reload — with diff:true, style.load never fires and marker/label settings get lost. */
   setStyle(styleId: StyleId): void {
+    this.styleReady = false
     this.map.setStyle(STYLE_URLS[styleId], { diff: false })
   }
 
@@ -97,18 +100,32 @@ export class MapController {
     return zoom - this.zoomOffset()
   }
 
-  /** Applies a precomputed camera + marker frame — the one path preview and export both go through. */
-  applyFrame(cameraFrame: CameraFrame, markers: RenderedMarker[]): void {
+  applyCameraFrame(cameraFrame: CameraFrame): void {
     this.map.jumpTo({
       center: cameraFrame.center,
       zoom: this.toZoom(cameraFrame.zr),
       bearing: cameraFrame.bearing,
       pitch: cameraFrame.pitch,
     })
+  }
+
+  renderMarkers(markers: RenderedMarker[]): void {
     for (const { marker, frame } of markers) this.renderMarker(marker, frame)
   }
 
+  /**
+   * Applies a precomputed camera + marker frame together — the one path
+   * playback and export both go through. Free editing (camera driven by
+   * the user's own pan/zoom) calls applyCameraFrame()/renderMarkers()
+   * separately instead, so setting a marker doesn't snap the camera back.
+   */
+  applyFrame(cameraFrame: CameraFrame, markers: RenderedMarker[]): void {
+    this.applyCameraFrame(cameraFrame)
+    this.renderMarkers(markers)
+  }
+
   private renderMarker(marker: MarkerObject, frame: MarkerFrame): void {
+    if (!this.styleReady) return
     const sourceId = `marker-${marker.id}`
     const haloLayerId = `${sourceId}-halo`
     const dotLayerId = `${sourceId}-dot`

@@ -1,0 +1,106 @@
+import 'maplibre-gl/dist/maplibre-gl.css'
+import type { MapMouseEvent } from 'maplibre-gl'
+import { useEffect, useRef, useState } from 'react'
+import { camAt } from '../../map/camera'
+import { MapController } from '../../map/MapController'
+import { markerStateAt } from '../../map/markerAnimation'
+import { useEditorStore } from '../../state/editorStore'
+import { useProjectStore } from '../../state/store'
+import { createDefaultMarker } from '../../state/types'
+import { timingTotals } from '../../timeline/timing'
+import { Crosshair } from './Crosshair'
+import { Readout } from './Readout'
+import styles from './MapStage.module.css'
+
+export function MapStage() {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const controllerRef = useRef<MapController | null>(null)
+  const styleIdRef = useRef<string | null>(null)
+
+  const project = useProjectStore((s) => s.project)
+  const locked = useEditorStore((s) => s.locked)
+
+  const [readout, setReadout] = useState<{ lng: number; lat: number; zr: number } | null>(null)
+
+  // Create the map once. Everything reactive after this reads the latest
+  // store state imperatively (via getState()) instead of closing over props,
+  // since map event handlers are not re-subscribed on every render.
+  useEffect(() => {
+    if (!containerRef.current) return
+    const initialProject = useProjectStore.getState().project
+    styleIdRef.current = initialProject.style.id
+
+    const controller = new MapController({
+      container: containerRef.current,
+      style: initialProject.style,
+      onStyleReady: () => {
+        const current = useProjectStore.getState().project
+        const totals = timingTotals(current.camera.timing)
+        controller.renderMarkers(
+          current.markers.map((marker) => ({ marker, frame: markerStateAt(marker, totals, null) })),
+        )
+      },
+    })
+    controllerRef.current = controller
+    controller.applyCameraFrame(camAt(initialProject.camera, 0))
+
+    const updateReadout = () => {
+      const c = controller.map.getCenter()
+      setReadout({ lng: c.lng, lat: c.lat, zr: controller.toRef(controller.map.getZoom()) })
+    }
+    controller.map.on('move', updateReadout)
+    updateReadout()
+
+    const handleContextMenu = (e: MapMouseEvent) => {
+      if (useEditorStore.getState().locked) return
+      e.originalEvent?.preventDefault()
+      const { lng, lat } = e.lngLat
+      useProjectStore.getState().setProject((p) => ({
+        ...p,
+        markers:
+          p.markers.length > 0
+            ? p.markers.map((m, i) => (i === 0 ? { ...m, lng, lat, visible: true } : m))
+            : [createDefaultMarker(lng, lat)],
+      }))
+    }
+    controller.map.on('contextmenu', handleContextMenu)
+
+    return () => {
+      controller.map.off('move', updateReadout)
+      controller.map.off('contextmenu', handleContextMenu)
+      controller.destroy()
+      controllerRef.current = null
+    }
+  }, [])
+
+  // Style id / label settings.
+  useEffect(() => {
+    const controller = controllerRef.current
+    if (!controller) return
+    controller.setLabelSettings(project.style)
+    if (styleIdRef.current !== project.style.id) {
+      styleIdRef.current = project.style.id
+      controller.setStyle(project.style.id)
+    }
+  }, [project.style])
+
+  // Marker content/appearance — rendered statically (sec=null) while editing;
+  // camera stays under the user's own pan/zoom, not driven by camAt() here.
+  useEffect(() => {
+    const controller = controllerRef.current
+    if (!controller) return
+    const totals = timingTotals(project.camera.timing)
+    controller.renderMarkers(
+      project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, totals, null) })),
+    )
+  }, [project.markers, project.camera.timing])
+
+  return (
+    <div className={styles.stage}>
+      <div ref={containerRef} className={styles.map} data-locked={locked || undefined}>
+        <Crosshair />
+        {readout && <Readout lng={readout.lng} lat={readout.lat} zr={readout.zr} />}
+      </div>
+    </div>
+  )
+}
