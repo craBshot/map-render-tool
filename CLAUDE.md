@@ -1,0 +1,69 @@
+# Map_Render_Tool
+
+Browser tool that renders animated map flights (zoom from country to region, target marker with pulse) and exports them as MP4 or image sequence for DaVinci Resolve. Private project, single user, used roughly once a week while editing videos.
+
+## Language
+
+- Code, comments, commit messages, docs and this file: **English**.
+- UI strings live in one central translation file. Default UI language: **German**. English can be added later.
+- The user often writes prompts in German. Answer in the language of the prompt.
+
+## Deployment and hard constraints
+
+- Web app, shipped as a static build via Docker (multi-stage: Node builds, nginx serves), behind Caddy. Reachable only on the local network or via WireGuard.
+- MP4 export (WebCodecs) requires a secure context: HTTPS, `localhost`, or an HTTP origin whitelisted via browser flag. Everything else works over plain HTTP. Without a secure context the app must say so clearly and point to the image sequence export.
+- No backend unless explicitly decided. No accounts, no API keys.
+- Ask before adding dependencies. All libraries as pinned npm packages, no CDN includes.
+
+## Tech
+
+- **Stack:** Vite + React + TypeScript. Keep UI components small; do not bury map logic inside components.
+- **Architecture:** One serializable project state (JSON: camera start/end, objects, style, timing, export settings) is the single source of truth. Rendering a frame is a pure function of state + time. Preview and export use the same function.
+- **Folders:** `src/map/` (MapLibre, layers, camera), `src/timeline/` (timing, animations), `src/export/` (MP4, image sequence), `src/state/` (project state, save/load, migrations), `src/ui/` (components), `src/i18n/` (UI strings).
+- **MapLibre GL JS 4.7.1** (intentionally pinned). v5 changes e.g. `preserveDrawingBuffer` → `canvasContextAttributes`. Upgrade only as a dedicated task.
+- **Map data:** OpenFreeMap styles (positron, liberty, bright, dark, fiord), no key.
+- **Place search:** Nominatim. Respect the usage policy: max 1 request/s, no search-as-you-type.
+- **Export:** MP4 via WebCodecs (H.264) + `mp4-muxer`; image sequence via JSZip.
+- **Reference:** `legacy/karten-zoom.html` is the working single-file version. Match its behavior when porting.
+
+## Known pitfalls (do not reintroduce)
+
+- Use `map.setStyle(url, { diff: false })`. With diffing, `style.load` does not fire and marker/label settings get lost.
+- After every style change, re-create custom sources/layers (markers etc.) and re-apply label settings.
+- Export is **deterministic per frame**: compute state from time, `jumpTo`, wait for `idle`, then read the canvas. Never record real-time animations.
+- `fadeDuration: 0`, otherwise labels are half-faded in frames.
+- Set export resolution via `setPixelRatio`, not container size, so the framing matches the preview.
+- Zoom values are stored normalized to a 1000 px reference width (`zr`) so window size and resolution do not change the framing.
+- Attribution is drawn into the canvas (DOM elements are not part of the export).
+- Crosshair and coordinate readout are DOM overlays and must never appear in exports.
+- Project files carry a version number. When the data format changes, add a migration; old projects must still load.
+
+## Commands
+
+- `npm run dev` – dev server
+- `npm test` – unit tests
+- `npm run test:e2e` – Playwright
+- `npm run build` – production build to `dist/`
+- `docker compose up -d --build` – build and serve
+
+## Workflow
+
+- Plan new features in plan mode first and present the plan.
+- Small steps, **one commit per finished change**, descriptive commit messages.
+- Run tests after every change. For visible changes, take a Playwright screenshot and check it.
+- No unrequested refactors outside the task.
+
+## Tests
+
+- Unit tests (Vitest) for pure logic: camera curve, timing, marker animation, migrations.
+- End-to-end with Playwright and Chromium. External services (tiles, styles, Nominatim) are mocked via route interception so tests run offline and reproducibly.
+- Required cases: page loads without console errors, marker visible (also after a style change), right-click sets marker, preview runs, MP4 export produces a valid file with the correct frame count (check with ffprobe if available).
+
+## Planned features (in order)
+
+1. **Multiple markers:** list instead of dropdown (color swatch, name, visibility, delete). Per marker: position, name as optional map label, appear time. "Apply style to all" copies only color, size and pulse.
+2. **Save/load projects** as JSON file (server-side storage optional later).
+3. **Highlight areas:** outline via Nominatim (`polygon_geojson`), shown as fill or spotlight (surroundings dimmed). Simple polygon tool for areas without an official boundary.
+4. **Routes:** route via public OSRM demo server (low usage, ~10 requests per editing day), line drawn progressively frame by frame in the export.
+
+Markers, areas and routes should eventually live in **one shared object list** with a unified timing model.
