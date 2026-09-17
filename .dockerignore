@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-ssr
+.git
+legacy
+e2e
+playwright-report
+test-results
+*.local
+.claude
