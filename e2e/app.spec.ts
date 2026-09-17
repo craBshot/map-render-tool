@@ -26,6 +26,17 @@ async function isMarkerVisible(page: import('@playwright/test').Page): Promise<b
   })
 }
 
+/** True if an area's fill layer exists and is not hidden. */
+async function isAreaVisible(page: import('@playwright/test').Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const controller = window.__mapController
+    if (!controller) return false
+    const fillLayer = controller.map.getStyle().layers.find((l) => l.id.startsWith('area-') && l.id.endsWith('-fill'))
+    if (!fillLayer) return false
+    return controller.map.getLayoutProperty(fillLayer.id, 'visibility') !== 'none'
+  })
+}
+
 test('loads without console errors', async ({ page }) => {
   const errors: string[] = []
   page.on('console', (msg) => {
@@ -50,6 +61,29 @@ test('right-click sets the marker, and it stays visible after a style change', a
   await page.selectOption('#mapStyle', 'dark')
   await page.waitForTimeout(300)
   await expect.poll(() => isMarkerVisible(page)).toBe(true)
+})
+
+test('area pick queries Overpass, adds the area, and it survives a style change', async ({ page }) => {
+  await gotoApp(page)
+
+  await page.getByRole('radio', { name: 'Gebiet abfragen' }).click()
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
+
+  // The real candidate survives the default settings filter…
+  const candidate = page.getByText('Testgebiet — Schutzgebiet')
+  await expect(candidate).toBeVisible()
+  // …the timezone noise entry does not.
+  await expect(page.getByText('UTC+01:00', { exact: false })).toHaveCount(0)
+
+  await candidate.click()
+  await page.getByRole('button', { name: 'Ausgewählte hinzufügen' }).click()
+  await expect.poll(() => isAreaVisible(page)).toBe(true)
+
+  // setStyle(diff:false) tears the map's layers down and rebuilds them —
+  // the known pitfall this must survive, same as markers.
+  await page.selectOption('#mapStyle', 'dark')
+  await page.waitForTimeout(300)
+  await expect.poll(() => isAreaVisible(page)).toBe(true)
 })
 
 test('preview runs and advances the time readout', async ({ page }) => {
