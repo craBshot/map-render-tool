@@ -11,6 +11,7 @@ type Which = 'start' | 'end'
 export function CameraPanel() {
   const camera = useProjectStore((s) => s.project.camera)
   const setProject = useProjectStore((s) => s.setProject)
+  const locked = useEditorStore((s) => s.locked)
   const t = strings.camera
 
   function capture(which: Which) {
@@ -34,7 +35,7 @@ export function CameraPanel() {
   return (
     <section className={styles.section}>
       <h2 className={styles.heading}>{t.heading}</h2>
-
+      <fieldset className={styles.fieldset} disabled={locked}>
       {(['start', 'end'] as const).map((which) => (
         <div className={styles.point} key={which}>
           <span className={`${styles.pin} ${which === 'end' ? styles.pinEnd : ''}`} />
@@ -97,6 +98,7 @@ export function CameraPanel() {
           />
         </div>
       </div>
+      </fieldset>
     </section>
   )
 }

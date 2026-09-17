@@ -6,6 +6,13 @@
   border-top: none;
 }
 
+.fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
 .heading {
   font-family: var(--font-head);
   font-size: 17px;
@@ -128,4 +135,14 @@
   font-size: 13px;
   line-height: 1.4;
   margin: 6px 0 0;
+}
+
+.msg {
+  font-size: 13.5px;
+  margin-top: 6px;
+  min-height: 1em;
+}
+.msgErr {
+  composes: msg;
+  color: var(--warn);
 }

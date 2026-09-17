@@ -9,6 +9,7 @@ const APPEAR_MODES: MarkerObject['appear']['mode'][] = ['start', 'zoomStart', 'z
 export function MarkerPanel() {
   const markers = useProjectStore((s) => s.project.markers)
   const setProject = useProjectStore((s) => s.setProject)
+  const locked = useEditorStore((s) => s.locked)
   const t = strings.marker
   const marker = markers[0]
 
@@ -30,7 +31,7 @@ export function MarkerPanel() {
   return (
     <section className={styles.section}>
       <h2 className={styles.heading}>{t.heading}</h2>
-
+      <fieldset className={styles.fieldset} disabled={locked}>
       <label className={styles.check}>
         <input type="checkbox" checked={marker?.visible ?? false} onChange={(e) => update((m) => ({ ...m, visible: e.target.checked }))} />
         {t.visible}
@@ -184,6 +185,7 @@ export function MarkerPanel() {
           )}
         </>
       )}
+      </fieldset>
     </section>
   )
 }

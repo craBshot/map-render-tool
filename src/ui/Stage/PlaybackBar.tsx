@@ -11,6 +11,7 @@ import styles from './PlaybackBar.module.css'
 export function PlaybackBar() {
   const rafRef = useRef<number | null>(null)
   const playing = useEditorStore((s) => s.playing)
+  const locked = useEditorStore((s) => s.locked)
   const playbackTimeSec = useEditorStore((s) => s.playbackTimeSec)
   const timing = useProjectStore((s) => s.project.camera.timing)
   const totals = timingTotals(timing)
@@ -76,10 +77,10 @@ export function PlaybackBar() {
 
   return (
     <div className={styles.bar}>
-      <button type="button" className={styles.button} onClick={play}>
+      <button type="button" className={styles.button} onClick={play} disabled={locked}>
         {playing ? strings.playback.stop : strings.playback.play}
       </button>
-      <button type="button" className={styles.button} onClick={reset}>
+      <button type="button" className={styles.button} onClick={reset} disabled={locked}>
         {strings.playback.reset}
       </button>
       <div className={styles.track}>

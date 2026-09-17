@@ -1,5 +1,6 @@
 import { strings } from '../../i18n'
 import { CameraPanel } from './CameraPanel'
+import { ExportPanel } from './ExportPanel'
 import { MarkerPanel } from './MarkerPanel'
 import { StylePanel } from './StylePanel'
 import styles from './Sidebar.module.css'
@@ -12,6 +13,7 @@ export function Sidebar() {
       <CameraPanel />
       <StylePanel />
       <MarkerPanel />
+      <ExportPanel />
     </aside>
   )
 }

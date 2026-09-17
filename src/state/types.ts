@@ -12,7 +12,14 @@ export type StyleId = 'positron' | 'liberty' | 'bright' | 'dark' | 'fiord'
 
 export type ExportFormat = 'mp4' | 'jpeg' | 'png'
 
-export type ResolutionPreset = '1920x1080' | '3840x2160' | 'custom'
+export type ResolutionPreset =
+  | '1920x1080'
+  | '3840x2160'
+  | '1080x1920'
+  | '1080x1080'
+  | '2160x2160'
+  | '1080x1350'
+  | 'custom'
 
 export interface CameraPoint {
   lng: number
@@ -90,7 +97,7 @@ export function createDefaultMarker(lng: number, lat: number): MarkerObject {
     color: '#2f6bff',
     sizePx: 9,
     pulse: { enabled: true, periodSec: 1.6, scale: 3.2, strength: 0.45 },
-    appear: { mode: 'zoomEnd', popDurationSec: 0.6 },
+    appear: { mode: 'zoomEnd', popDurationSec: 0.4 },
     visible: true,
   }
 }
@@ -105,16 +112,16 @@ export function createDefaultProject(): ProjectFile {
     },
     style: {
       id: 'positron',
-      labelDensity: 2,
+      labelDensity: 1,
       germanNames: true,
-      hideMinorLabels: false,
+      hideMinorLabels: true,
     },
     markers: [],
     export: {
       resolution: { preset: '1920x1080', width: 1920, height: 1080 },
       fps: 30,
       format: 'mp4',
-      quality: 1,
+      quality: 0.35,
       showAttribution: true,
     },
   }
