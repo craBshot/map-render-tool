@@ -40,7 +40,8 @@ export interface MarkerObject {
     enabled: boolean
     periodSec: number
     scale: number
-    strengthPct: number
+    /** Halo opacity fraction (0..1), not a percentage. */
+    strength: number
   }
   appear: {
     mode: 'start' | 'zoomStart' | 'zoomEnd' | 'custom'
