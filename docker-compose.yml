@@ -1,0 +1,10 @@
+services:
+  map-render-tool:
+    build: .
+    container_name: map-render-tool
+    restart: unless-stopped
+    # Bound to localhost by default — point your existing Caddy instance at
+    # 127.0.0.1:8080. Change the left-hand side (or drop the 127.0.0.1: prefix
+    # entirely) if Caddy runs in another container on a shared network instead.
+    ports:
+      - "127.0.0.1:8080:80"
