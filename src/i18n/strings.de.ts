@@ -8,6 +8,11 @@ export const de = {
     placeholder: 'z. B. Jönköping',
     button: 'Suchen',
   },
+  playback: {
+    play: 'Vorschau abspielen',
+    stop: 'Vorschau stoppen',
+    reset: 'Zum Start',
+  },
   camera: {
     heading: 'Kamerafahrt',
     start: 'Start',

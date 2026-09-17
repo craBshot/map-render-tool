@@ -11,8 +11,12 @@ import type { MapController } from '../map/MapController'
 interface EditorStore {
   playbackTimeSec: number
   setPlaybackTimeSec: (sec: number) => void
+  /** True while the preview is animating — hides crosshair/readout, unlike locked. */
+  playing: boolean
+  setPlaying: (playing: boolean) => void
   crosshairVisible: boolean
   setCrosshairVisible: (visible: boolean) => void
+  /** True during export — also disables pointer interaction with the map. */
   locked: boolean
   setLocked: (locked: boolean) => void
   controller: MapController | null
@@ -22,6 +26,8 @@ interface EditorStore {
 export const useEditorStore = create<EditorStore>((set) => ({
   playbackTimeSec: 0,
   setPlaybackTimeSec: (sec) => set({ playbackTimeSec: sec }),
+  playing: false,
+  setPlaying: (playing) => set({ playing }),
   crosshairVisible: true,
   setCrosshairVisible: (visible) => set({ crosshairVisible: visible }),
   locked: false,

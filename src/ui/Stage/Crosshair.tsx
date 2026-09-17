@@ -5,7 +5,8 @@ import styles from './Crosshair.module.css'
 export function Crosshair() {
   const visible = useEditorStore((s) => s.crosshairVisible)
   const locked = useEditorStore((s) => s.locked)
-  if (!visible || locked) return null
+  const playing = useEditorStore((s) => s.playing)
+  if (!visible || locked || playing) return null
 
   return (
     <div className={styles.crosshair}>

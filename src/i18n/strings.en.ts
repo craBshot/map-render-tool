@@ -13,6 +13,11 @@ export const en: typeof de = {
     placeholder: 'e.g. Jönköping',
     button: 'Search',
   },
+  playback: {
+    play: 'Play preview',
+    stop: 'Stop preview',
+    reset: 'Back to start',
+  },
   camera: {
     heading: 'Camera flight',
     start: 'Start',
