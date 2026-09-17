@@ -1,0 +1,198 @@
+import maplibregl from 'maplibre-gl'
+import type { CameraFrame } from './camera'
+import { applyLabelSettings, captureOriginalLayers, type OriginalLayerInfo } from './labels'
+import type { MarkerFrame } from './markerAnimation'
+import type { MarkerObject, StyleId, StyleState } from '../state/types'
+
+export const STYLE_URLS: Record<StyleId, string> = {
+  positron: 'https://tiles.openfreemap.org/styles/positron',
+  liberty: 'https://tiles.openfreemap.org/styles/liberty',
+  bright: 'https://tiles.openfreemap.org/styles/bright',
+  dark: 'https://tiles.openfreemap.org/styles/dark',
+  fiord: 'https://tiles.openfreemap.org/styles/fiord',
+}
+
+/** Zoom values are stored normalized to this reference width (zr). */
+const REF_W = 1000
+
+const GERMAN_LOCALE = {
+  'NavigationControl.ZoomIn': 'Hineinzoomen',
+  'NavigationControl.ZoomOut': 'Herauszoomen',
+  'NavigationControl.ResetBearing': 'Ausrichtung zurücksetzen',
+  'ScrollZoomBlocker.CtrlMessage': 'Strg + Scrollen zum Zoomen',
+  'TouchPanBlocker.Message': 'Zwei Finger zum Verschieben',
+}
+
+export interface RenderedMarker {
+  marker: MarkerObject
+  frame: MarkerFrame
+}
+
+export interface MapControllerOptions {
+  container: HTMLElement
+  style: StyleState
+  /** Fires after every style (re)load, once labels/markers are safe to touch again. */
+  onStyleReady?: () => void
+}
+
+/**
+ * Thin wrapper around a maplibregl.Map carrying all the side-effecting,
+ * viewport-dependent logic (style/label handling, camera application,
+ * marker rendering, resizing). Everything here is deliberately impure —
+ * the pure math lives in camera.ts/markerAnimation.ts.
+ */
+export class MapController {
+  readonly map: maplibregl.Map
+  private originalLayers: Record<string, OriginalLayerInfo> = {}
+  private labelSettings: StyleState
+
+  constructor(options: MapControllerOptions) {
+    this.labelSettings = options.style
+
+    this.map = new maplibregl.Map({
+      container: options.container,
+      style: STYLE_URLS[options.style.id],
+      center: [0, 0],
+      zoom: 0,
+      // Required so the export canvas can read back WebGL pixels.
+      preserveDrawingBuffer: true,
+      // Otherwise labels are half-faded in captured frames.
+      fadeDuration: 0,
+      attributionControl: false,
+      dragRotate: false,
+      pitchWithRotate: false,
+      touchPitch: false,
+      maxPitch: 0,
+      locale: GERMAN_LOCALE,
+    })
+    this.map.touchZoomRotate.disableRotation()
+    this.map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+
+    this.map.on('style.load', () => {
+      this.originalLayers = captureOriginalLayers(this.map)
+      applyLabelSettings(this.map, this.originalLayers, this.labelSettings)
+      options.onStyleReady?.()
+    })
+  }
+
+  /** Forces a full style reload — with diff:true, style.load never fires and marker/label settings get lost. */
+  setStyle(styleId: StyleId): void {
+    this.map.setStyle(STYLE_URLS[styleId], { diff: false })
+  }
+
+  setLabelSettings(settings: StyleState): void {
+    this.labelSettings = settings
+    applyLabelSettings(this.map, this.originalLayers, settings)
+  }
+
+  private zoomOffset(): number {
+    return Math.log2(Math.max(1, this.map.getContainer().clientWidth) / REF_W)
+  }
+
+  toZoom(zr: number): number {
+    return zr + this.zoomOffset()
+  }
+
+  toRef(zoom: number): number {
+    return zoom - this.zoomOffset()
+  }
+
+  /** Applies a precomputed camera + marker frame — the one path preview and export both go through. */
+  applyFrame(cameraFrame: CameraFrame, markers: RenderedMarker[]): void {
+    this.map.jumpTo({
+      center: cameraFrame.center,
+      zoom: this.toZoom(cameraFrame.zr),
+      bearing: cameraFrame.bearing,
+      pitch: cameraFrame.pitch,
+    })
+    for (const { marker, frame } of markers) this.renderMarker(marker, frame)
+  }
+
+  private renderMarker(marker: MarkerObject, frame: MarkerFrame): void {
+    const sourceId = `marker-${marker.id}`
+    const haloLayerId = `${sourceId}-halo`
+    const dotLayerId = `${sourceId}-dot`
+    const data = {
+      type: 'Feature' as const,
+      properties: {},
+      geometry: { type: 'Point' as const, coordinates: [marker.lng, marker.lat] },
+    }
+
+    const source = this.map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined
+    if (!source) {
+      this.map.addSource(sourceId, { type: 'geojson', data })
+      this.map.addLayer({
+        id: haloLayerId,
+        type: 'circle',
+        source: sourceId,
+        paint: { 'circle-pitch-alignment': 'map', 'circle-blur': 0.15 },
+      })
+      this.map.addLayer({
+        id: dotLayerId,
+        type: 'circle',
+        source: sourceId,
+        paint: { 'circle-stroke-color': '#ffffff' },
+      })
+    } else {
+      source.setData(data)
+    }
+
+    const visibility = frame.visible ? 'visible' : 'none'
+    this.map.setLayoutProperty(haloLayerId, 'visibility', visibility)
+    this.map.setLayoutProperty(dotLayerId, 'visibility', visibility)
+    if (!frame.visible) return
+
+    this.map.setPaintProperty(haloLayerId, 'circle-color', marker.color)
+    this.map.setPaintProperty(haloLayerId, 'circle-radius', frame.haloRadius)
+    this.map.setPaintProperty(haloLayerId, 'circle-opacity', frame.haloOpacity)
+    this.map.setPaintProperty(dotLayerId, 'circle-color', marker.color)
+    this.map.setPaintProperty(dotLayerId, 'circle-radius', frame.radius)
+    this.map.setPaintProperty(dotLayerId, 'circle-opacity', frame.opacity)
+    this.map.setPaintProperty(dotLayerId, 'circle-stroke-width', frame.radius > 0 ? Math.max(1.5, marker.sizePx * 0.22) : 0)
+    this.map.setPaintProperty(dotLayerId, 'circle-stroke-opacity', frame.opacity)
+  }
+
+  /** Set export resolution via pixel ratio, not container size, so framing matches the preview. */
+  setPixelRatio(ratio: number): void {
+    this.map.setPixelRatio(ratio)
+  }
+
+  /** Sizes the map container to fit targetW/H inside the available stage box, preserving center/zoom. */
+  fitStage(targetWidthPx: number, targetHeightPx: number, stageBox: { width: number; height: number }, padding = 28): void {
+    const scale = Math.min(
+      (stageBox.width - padding * 2) / targetWidthPx,
+      (stageBox.height - padding * 2) / targetHeightPx,
+    )
+    const container = this.map.getContainer()
+    const hadSize = container.clientWidth > 0
+    const center = hadSize ? this.map.getCenter() : null
+    const ref = hadSize ? this.toRef(this.map.getZoom()) : null
+
+    container.style.width = `${Math.max(100, Math.floor(targetWidthPx * scale))}px`
+    container.style.height = `${Math.max(60, Math.floor(targetHeightPx * scale))}px`
+    this.map.resize()
+
+    if (hadSize && center && ref !== null) {
+      this.map.jumpTo({ center, zoom: this.toZoom(ref) })
+    }
+  }
+
+  waitIdle(timeoutMs = 20000): Promise<void> {
+    return new Promise((resolve) => {
+      let done = false
+      const finish = () => {
+        if (done) return
+        done = true
+        clearTimeout(timer)
+        resolve()
+      }
+      const timer = setTimeout(finish, timeoutMs)
+      this.map.once('idle', finish)
+      this.map.triggerRepaint()
+    })
+  }
+
+  destroy(): void {
+    this.map.remove()
+  }
+}
