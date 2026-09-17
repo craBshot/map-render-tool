@@ -7,6 +7,10 @@ export const de = {
     heading: 'Ort finden',
     placeholder: 'z. B. Jönköping',
     button: 'Suchen',
+    searching: 'Suche …',
+    notFound: (query: string) => `„${query}“ nicht gefunden. Anders schreiben oder Land ergänzen.`,
+    serviceError: (status: number) => `Suchdienst antwortet nicht (${status})`,
+    failedPrefix: 'Suche fehlgeschlagen: ',
   },
   playback: {
     play: 'Vorschau abspielen',

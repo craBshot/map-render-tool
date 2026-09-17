@@ -12,6 +12,10 @@ export const en: typeof de = {
     heading: 'Find a place',
     placeholder: 'e.g. Jönköping',
     button: 'Search',
+    searching: 'Searching …',
+    notFound: (query: string) => `"${query}" not found. Try a different spelling or add the country.`,
+    serviceError: (status: number) => `Search service not responding (${status})`,
+    failedPrefix: 'Search failed: ',
   },
   playback: {
     play: 'Play preview',

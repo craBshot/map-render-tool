@@ -13,6 +13,12 @@
   min-width: 0;
 }
 
+.searchRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+}
+
 .heading {
   font-family: var(--font-head);
   font-size: 17px;
