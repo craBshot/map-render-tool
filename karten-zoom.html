@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karten-Zoom</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@600&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.js"></script>
+<style>
+  :root {
+    --paper: #E6EBEE;
+    --panel: #F4F6F7;
+    --ink: #1D2B33;
+    --muted: #6B7C86;
+    --line: #C9D3D9;
+    --stage: #B9C5CC;
+    --accent: #2F6BFF;
+    --accent-ink: #FFFFFF;
+    --warn: #B4442E;
+    --font: "Barlow", "Segoe UI", system-ui, sans-serif;
+    --font-head: "Barlow Semi Condensed", "Barlow", "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: var(--font);
+    font-size: 15px;
+    color: var(--ink);
+    background: var(--paper);
+    display: grid;
+    grid-template-columns: 330px 1fr;
+    overflow: hidden;
+  }
+  aside {
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 20px 20px 28px;
+  }
+  h1 {
+    font-family: var(--font-head);
+    font-size: 26px;
+    line-height: 1.1;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .lede { color: var(--muted); margin: 0 0 18px; line-height: 1.4; }
+  section { padding: 14px 0; border-top: 1px solid var(--line); }
+  h2 {
+    font-family: var(--font-head);
+    font-size: 17px;
+    margin: 0 0 10px;
+  }
+  label { display: block; margin: 8px 0 4px; color: var(--muted); font-size: 13.5px; }
+  label.check { display: flex; gap: 8px; align-items: center; color: var(--ink); font-size: 15px; margin: 8px 0; }
+  select, input[type=text], input[type=number] {
+    width: 100%;
+    font: inherit;
+    color: var(--ink);
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 7px 9px;
+  }
+  input[type=color] { width: 44px; height: 32px; border: 1px solid var(--line); border-radius: 6px; padding: 2px; background: #fff; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  [hidden] { display: none !important; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .search { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+  button {
+    font: inherit;
+    font-weight: 500;
+    color: var(--ink);
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 7px 10px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--muted); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  button:disabled { opacity: .5; cursor: default; }
+  .point {
+    display: grid;
+    grid-template-columns: 14px 1fr;
+    gap: 10px;
+    align-items: start;
+    margin: 10px 0 14px;
+  }
+  .pin { width: 14px; height: 14px; border-radius: 50%; margin-top: 3px; border: 2px solid var(--ink); background: #fff; }
+  .pin.end { background: #fff; border-color: var(--accent); border-style: dashed; }
+  .pin.dotpin { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px rgba(47,107,255,.25); }
+  .point strong { display: block; font-weight: 600; }
+  .coords { color: var(--muted); font-size: 13.5px; font-variant-numeric: tabular-nums; margin: 2px 0 6px; }
+  .point .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .point .btns button { padding: 4px 8px; font-size: 13.5px; }
+  .hint { color: var(--muted); font-size: 13px; line-height: 1.4; margin: 6px 0 0; }
+  .msg { font-size: 13.5px; margin-top: 6px; min-height: 1em; }
+  .msg.err { color: var(--warn); }
+
+  main {
+    background: var(--stage);
+    display: grid;
+    grid-template-rows: 1fr auto;
+    min-width: 0;
+    min-height: 0;
+  }
+  #stage { position: relative; min-height: 0; display: grid; place-items: center; }
+  #map {
+    background: #fff;
+    box-shadow: 0 1px 0 rgba(29,43,51,.08), 0 12px 32px rgba(29,43,51,.18);
+  }
+  #map.locked { pointer-events: none; }
+  .crosshair {
+    position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+    pointer-events: none; z-index: 3;
+  }
+  .crosshair span { position: absolute; background: var(--ink); box-shadow: 0 0 0 1px rgba(255,255,255,.85); }
+  .crosshair .h { height: 1px; width: 14px; top: 0; }
+  .crosshair .h.l { left: -20px; } .crosshair .h.r { left: 6px; }
+  .crosshair .v { width: 1px; height: 14px; left: 0; }
+  .crosshair .v.t { top: -20px; } .crosshair .v.b { top: 6px; }
+  .crosshair .c { width: 3px; height: 3px; left: -1px; top: -1px; border-radius: 50%; }
+  .readout {
+    position: absolute; left: 8px; bottom: 8px; z-index: 3; pointer-events: none;
+    font: 500 12.5px var(--font); font-variant-numeric: tabular-nums;
+    color: var(--ink); background: rgba(255,255,255,.85); padding: 3px 7px; border-radius: 4px;
+  }
+  #map.clean .crosshair, #map.clean .readout, #map.no-cross .crosshair, #map.no-cross .readout { display: none; }
+  .bar {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 20px;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+  }
+  .track { position: relative; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .track > div { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); }
+  #time { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 120px; text-align: right; }
+  .maplibregl-ctrl-group button { border-radius: 0; border: 0; padding: 0; }
+
+  @media (max-width: 760px) {
+    body { grid-template-columns: 1fr; grid-template-rows: 55vh auto; overflow: auto; }
+    aside { order: 2; border-right: 0; }
+    main { order: 1; }
+  }
+</style>
+</head>
+<body>
+<aside>
+  <h1>Karten-Zoom</h1>
+  <p class="lede">Karte ausrichten, Start und Ziel merken, als Bildsequenz exportieren.</p>
+
+  <section>
+    <h2>Ort finden</h2>
+    <div class="search">
+      <input id="q" type="text" placeholder="z. B. Jönköping" autocomplete="off">
+      <button id="searchBtn">Suchen</button>
+    </div>
+    <div id="searchMsg" class="msg"></div>
+  </section>
+
+  <section>
+    <h2>Kamerafahrt</h2>
+    <div class="point">
+      <span class="pin"></span>
+      <div>
+        <strong>Start</strong>
+        <div class="coords" id="startInfo"></div>
+        <div class="btns">
+          <button id="setStart">Aktuelle Ansicht übernehmen</button>
+          <button id="goStart">Anzeigen</button>
+        </div>
+      </div>
+    </div>
+    <div class="point">
+      <span class="pin end"></span>
+      <div>
+        <strong>Ziel</strong>
+        <div class="coords" id="endInfo"></div>
+        <div class="btns">
+          <button id="setEnd">Aktuelle Ansicht übernehmen</button>
+          <button id="goEnd">Anzeigen</button>
+        </div>
+      </div>
+    </div>
+    <div class="point">
+      <span class="pin dotpin"></span>
+      <div>
+        <strong>Punkt</strong>
+        <div class="coords" id="dotInfo"></div>
+        <div class="btns">
+          <button id="setDot">Kartenmitte übernehmen</button>
+          <button id="dotToEnd">Auf Zielmitte</button>
+        </div>
+      </div>
+    </div>
+    <label class="check"><input id="cross" type="checkbox" checked> Fadenkreuz in der Kartenmitte</label>
+    <p class="hint">Start und Ziel speichern nur den Kartenausschnitt, der Punkt ist unabhängig davon. Rechtsklick auf die Karte setzt den Punkt direkt an diese Stelle.</p>
+    <div class="row3">
+      <div><label for="holdStart">Start halten (s)</label><input id="holdStart" type="number" min="0" step="0.5" value="1"></div>
+      <div><label for="dur">Zoom (s)</label><input id="dur" type="number" min="0.5" step="0.5" value="4"></div>
+      <div><label for="holdEnd">Ziel halten (s)</label><input id="holdEnd" type="number" min="0" step="0.5" value="2"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Aussehen</h2>
+    <label for="style">Kartenstil</label>
+    <select id="style">
+      <option value="positron">Hell, reduziert</option>
+      <option value="liberty">Farbig, detailliert</option>
+      <option value="bright">Farbig, klassisch</option>
+      <option value="dark">Dunkel</option>
+      <option value="fiord">Dunkelblau</option>
+    </select>
+    <label for="density">Ortsnamen</label>
+    <select id="density">
+      <option value="0">Nur Hauptstädte</option>
+      <option value="1" selected>Großstädte</option>
+      <option value="2">Städte und Kleinstädte</option>
+      <option value="3">Alle Orte</option>
+    </select>
+    <label class="check"><input id="german" type="checkbox" checked> Deutsche Ortsnamen, wo vorhanden</label>
+    <label class="check"><input id="hideMinor" type="checkbox" checked> Straßen- und POI-Namen ausblenden</label>
+    <p class="hint">Die Ortsdichte passt sich automatisch der Zoomstufe an, wie bei Google Maps.</p>
+  </section>
+
+  <section>
+    <h2>Zielpunkt</h2>
+    <label class="check"><input id="dot" type="checkbox" checked> Punkt am Ziel zeigen</label>
+    <div class="row" style="align-items:end">
+      <div><label for="dotColor">Farbe</label><input id="dotColor" type="color" value="#2f6bff"></div>
+      <div><label for="dotSize">Größe (px)</label><input id="dotSize" type="number" min="2" max="40" value="9"></div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="appear">Erscheint</label>
+        <select id="appear">
+          <option value="start">Von Anfang an</option>
+          <option value="zoomStart">Mit Zoombeginn</option>
+          <option value="zoomEnd" selected>Nach dem Zoom</option>
+          <option value="custom">Zu eigener Zeit</option>
+        </select>
+      </div>
+      <div><label for="popDur">Einblenddauer (s)</label><input id="popDur" type="number" min="0" step="0.1" value="0.4"></div>
+    </div>
+    <div id="appearCustomRow" hidden>
+      <label for="appearAt">Zeitpunkt ab Videostart (s)</label>
+      <input id="appearAt" type="number" min="0" step="0.1" value="2">
+    </div>
+    <label class="check"><input id="pulse" type="checkbox" checked> Pulsieren</label>
+    <div class="row3">
+      <div><label for="pulsePeriod">Takt (s)</label><input id="pulsePeriod" type="number" min="0.2" step="0.1" value="1.6"></div>
+      <div><label for="pulseScale">Reichweite (×)</label><input id="pulseScale" type="number" min="1.2" max="12" step="0.1" value="3.2"></div>
+      <div><label for="pulseStrength">Deckkraft (%)</label><input id="pulseStrength" type="number" min="5" max="100" step="5" value="45"></div>
+    </div>
+    <p class="hint">Takt ist die Dauer eines Pulses, Reichweite die maximale Ringgröße relativ zum Punkt. Der Ring übernimmt die Punktfarbe.</p>
+    <p id="dotWarn" class="msg err"></p>
+  </section>
+
+  <section>
+    <h2>Export</h2>
+    <div class="row">
+      <div>
+        <label for="res">Auflösung</label>
+        <select id="res">
+          <option value="1920x1080">1920 × 1080</option>
+          <option value="3840x2160">3840 × 2160</option>
+          <option value="1080x1920">1080 × 1920 (hoch)</option>
+          <option value="1080x1080">1080 × 1080 (quadratisch)</option>
+          <option value="2160x2160">2160 × 2160 (quadratisch)</option>
+          <option value="1080x1350">1080 × 1350 (4:5)</option>
+          <option value="custom">Eigene …</option>
+        </select>
+      </div>
+      <div>
+        <label for="fps">Bilder/s</label>
+        <select id="fps">
+          <option>24</option><option>25</option><option selected>30</option><option>50</option><option>60</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" id="customRes" hidden>
+      <div><label for="cw">Breite (px)</label><input id="cw" type="number" min="200" max="4096" step="2" value="1440"></div>
+      <div><label for="ch">Höhe (px)</label><input id="ch" type="number" min="200" max="4096" step="2" value="1440"></div>
+    </div>
+    <label for="fmt">Format</label>
+    <select id="fmt">
+      <option value="mp4" selected>MP4-Video (H.264)</option>
+      <option value="jpeg">Bildsequenz JPEG</option>
+      <option value="png">Bildsequenz PNG (verlustfrei, groß)</option>
+    </select>
+    <div id="qualityRow">
+      <label for="quality">Videoqualität</label>
+      <select id="quality">
+        <option value="0.2">Normal</option>
+        <option value="0.35" selected>Hoch</option>
+        <option value="0.6">Sehr hoch (große Datei)</option>
+      </select>
+    </div>
+    <label class="check"><input id="attrib" type="checkbox" checked> Quellenangabe einblenden</label>
+    <p class="hint">Die Quellenangabe (OpenStreetMap) ist Pflicht, sobald das Video öffentlich gezeigt wird.</p>
+    <div style="display:flex; gap:8px; margin-top:12px">
+      <button id="exportBtn" class="primary">Exportieren</button>
+      <button id="cancelBtn" disabled>Abbrechen</button>
+    </div>
+    <div id="exportMsg" class="msg"></div>
+  </section>
+</aside>
+
+<main>
+  <div id="stage"><div id="map"></div></div>
+  <div class="bar">
+    <button id="playBtn">Vorschau abspielen</button>
+    <button id="resetBtn">Zum Start</button>
+    <div class="track"><div id="progress"></div></div>
+    <div id="time">0,0 / 0,0 s</div>
+  </div>
+</main>
+
+<script>
+(() => {
+  const REF_W = 1000; // Zoomwerte werden auf diese Vorschaubreite normiert
+  const STYLE_URLS = {
+    positron: 'https://tiles.openfreemap.org/styles/positron',
+    liberty: 'https://tiles.openfreemap.org/styles/liberty',
+    bright: 'https://tiles.openfreemap.org/styles/bright',
+    dark: 'https://tiles.openfreemap.org/styles/dark',
+    fiord: 'https://tiles.openfreemap.org/styles/fiord',
+  };
+  const MINOR_LAYERS = ['transportation_name', 'poi', 'aerodrome_label', 'mountain_peak', 'housenumber'];
+  const ATTRIBUTION = '© OpenMapTiles  © OpenStreetMap-Mitwirkende';
+  const $ = id => document.getElementById(id);
+  const mapEl = $('map');
+
+  const state = {
+    start: { lng: 12.0, lat: 55.0, zr: 2.6 },
+    end: { lng: 14.16, lat: 57.78, zr: 7.6 },
+    dot: null,
+  };
+
+  // ---------- Einstellungen merken ----------
+  const PERSIST = ['style', 'density', 'german', 'hideMinor', 'cross', 'dot', 'dotColor', 'dotSize',
+    'appear', 'popDur', 'appearAt', 'pulse', 'pulsePeriod', 'pulseScale', 'pulseStrength',
+    'res', 'cw', 'ch', 'fps', 'fmt', 'quality', 'attrib', 'holdStart', 'dur', 'holdEnd'];
+  function loadSettings() {
+    try {
+      const s = JSON.parse(localStorage.getItem('kartenzoom') || 'null');
+      if (!s) return;
+      for (const k of PERSIST) {
+        if (!(k in s)) continue;
+        const el = $(k);
+        if (el.type === 'checkbox') el.checked = s[k]; else el.value = s[k];
+      }
+      if (s.start) state.start = s.start;
+      if (s.end) state.end = s.end;
+      if (s.dot) state.dot = s.dot;
+    } catch (e) { /* ohne gespeicherte Werte weiter */ }
+  }
+  function saveSettings() {
+    try {
+      const s = { start: state.start, end: state.end, dot: state.dot };
+      for (const k of PERSIST) { const el = $(k); s[k] = el.type === 'checkbox' ? el.checked : el.value; }
+      localStorage.setItem('kartenzoom', JSON.stringify(s));
+    } catch (e) { /* Speicher nicht verfügbar */ }
+  }
+  loadSettings();
+  if (!state.dot) state.dot = { lng: state.end.lng, lat: state.end.lat };
+
+  // ---------- Karte ----------
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: STYLE_URLS[$('style').value],
+    center: [state.start.lng, state.start.lat],
+    zoom: 3,
+    preserveDrawingBuffer: true,
+    fadeDuration: 0,
+    attributionControl: false,
+    dragRotate: false,
+    pitchWithRotate: false,
+    touchPitch: false,
+    maxPitch: 0,
+    locale: {
+      'NavigationControl.ZoomIn': 'Hineinzoomen',
+      'NavigationControl.ZoomOut': 'Herauszoomen',
+      'NavigationControl.ResetBearing': 'Ausrichtung zurücksetzen',
+      'ScrollZoomBlocker.CtrlMessage': 'Strg + Scrollen zum Zoomen',
+      'TouchPanBlocker.Message': 'Zwei Finger zum Verschieben',
+    },
+  });
+  map.touchZoomRotate.disableRotation();
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+  const zoomOffset = () => Math.log2(Math.max(1, mapEl.clientWidth) / REF_W);
+  const toZoom = zr => zr + zoomOffset();
+  const toRef = z => z - zoomOffset();
+
+  function currentRes() {
+    if ($('res').value === 'custom') {
+      const clamp = v => Math.min(4096, Math.max(200, Math.round((Number(v) || 1080) / 2) * 2));
+      return [clamp($('cw').value), clamp($('ch').value)];
+    }
+    const [w, h] = $('res').value.split('x').map(Number);
+    return [w, h];
+  }
+  function toggleCustom() { $('customRes').hidden = $('res').value !== 'custom'; }
+
+  function fitStage() {
+    const [W, H] = currentRes();
+    const box = $('stage').getBoundingClientRect();
+    const pad = 28;
+    const scale = Math.min((box.width - pad * 2) / W, (box.height - pad * 2) / H);
+    const hadSize = mapEl.clientWidth > 0;
+    const center = hadSize ? map.getCenter() : null;
+    const ref = hadSize ? toRef(map.getZoom()) : null;
+    mapEl.style.width = Math.max(100, Math.floor(W * scale)) + 'px';
+    mapEl.style.height = Math.max(60, Math.floor(H * scale)) + 'px';
+    map.resize();
+    if (hadSize) map.jumpTo({ center, zoom: toZoom(ref) });
+  }
+
+  // ---------- Beschriftung ----------
+  let original = {};
+
+  function placeCategory(layer) {
+    const id = layer.id.toLowerCase();
+    if (/country|state|continent/.test(id)) return -1;
+    if (id.includes('capital')) return 0;
+    if (/village|hamlet|suburb|neighbourhood|quarter|other|island|locality/.test(id)) return 3;
+    if (id.includes('town')) return 2;
+    if (id.includes('city')) return 1;
+    const f = JSON.stringify(layer.filter || '').toLowerCase();
+    if (/"(village|hamlet|suburb|neighbourhood)"/.test(f)) return 3;
+    if (f.includes('"town"')) return 2;
+    if (f.includes('"city"')) return 1;
+    return 3;
+  }
+
+  function captureOriginals() {
+    original = {};
+    for (const l of map.getStyle().layers) {
+      if (l.type !== 'symbol') continue;
+      original[l.id] = {
+        visibility: (l.layout && l.layout.visibility) || 'visible',
+        textField: l.layout ? l.layout['text-field'] : undefined,
+      };
+    }
+  }
+
+  function applyLabels() {
+    const style = map.getStyle();
+    if (!style) return;
+    const level = Number($('density').value);
+    const german = $('german').checked;
+    const hideMinor = $('hideMinor').checked;
+    const deField = ['coalesce', ['get', 'name:de'], ['get', 'name:latin'], ['get', 'name']];
+    for (const l of style.layers) {
+      if (l.type !== 'symbol' || !original[l.id]) continue;
+      const src = l['source-layer'];
+      const orig = original[l.id];
+      if (src === 'place') {
+        const cat = placeCategory(l);
+        const show = cat <= level && orig.visibility !== 'none';
+        map.setLayoutProperty(l.id, 'visibility', show ? 'visible' : 'none');
+        if (orig.textField !== undefined) {
+          map.setLayoutProperty(l.id, 'text-field', german ? deField : orig.textField);
+        }
+      } else if (MINOR_LAYERS.includes(src)) {
+        map.setLayoutProperty(l.id, 'visibility', hideMinor ? 'none' : orig.visibility);
+      }
+      // Gewässer, Parks und übrige Beschriftungen ebenfalls eindeutschen
+      if (src !== 'place' && orig.textField !== undefined && /name/.test(JSON.stringify(orig.textField))
+          && !/housenumber|ref/.test(JSON.stringify(orig.textField))) {
+        map.setLayoutProperty(l.id, 'text-field', german ? deField : orig.textField);
+      }
+    }
+  }
+
+  // ---------- Zielpunkt ----------
+  let styleReady = false;
+
+  function dotParams() {
+    return {
+      on: $('dot').checked,
+      color: $('dotColor').value,
+      size: Math.max(2, Number($('dotSize').value) || 9),
+      pop: Math.max(0, Number($('popDur').value) || 0),
+      pulse: $('pulse').checked,
+      period: Math.max(0.2, Number($('pulsePeriod').value) || 1.6),
+      scale: Math.max(1.2, Number($('pulseScale').value) || 3.2),
+      strength: Math.min(1, Math.max(0.05, (Number($('pulseStrength').value) || 45) / 100)),
+    };
+  }
+
+  function appearTime() {
+    const { hs, d } = timing();
+    switch ($('appear').value) {
+      case 'start': return 0;
+      case 'zoomStart': return hs;
+      case 'zoomEnd': return hs + d;
+      default: return Math.max(0, Number($('appearAt').value) || 0);
+    }
+  }
+
+  const easeOutBack = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+
+  // sec === null: statische Ansicht zum Einrichten
+  function dotState(sec) {
+    const p = dotParams();
+    if (!p.on) return { vis: false };
+    if (sec === null) {
+      return { vis: true, r: p.size, o: 1, hr: p.pulse ? p.size * (1 + (p.scale - 1) * 0.6) : 0, ho: p.pulse ? p.strength * 0.5 : 0 };
+    }
+    const a = appearTime();
+    if (sec < a) return { vis: true, r: 0, o: 0, hr: 0, ho: 0 };
+    const k = p.pop > 0 ? Math.min(1, (sec - a) / p.pop) : 1;
+    const r = Math.max(0, p.size * easeOutBack(k));
+    const o = Math.min(1, k * 2);
+    let hr = 0, ho = 0;
+    if (p.pulse && k >= 1) {
+      const ph = (((sec - a - p.pop) / p.period) % 1 + 1) % 1;
+      const e = 1 - Math.pow(1 - ph, 3);
+      hr = p.size + (p.size * p.scale - p.size) * e;
+      ho = p.strength * (1 - ph);
+    }
+    return { vis: true, r, o, hr, ho };
+  }
+
+  function renderDot(sec) {
+    if (!styleReady) return;
+    const p = dotParams();
+    const data = { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [state.dot.lng, state.dot.lat] } };
+    if (!map.getSource('ziel')) {
+      map.addSource('ziel', { type: 'geojson', data });
+      map.addLayer({ id: 'ziel-puls', type: 'circle', source: 'ziel', paint: { 'circle-pitch-alignment': 'map', 'circle-blur': 0.15 } });
+      map.addLayer({ id: 'ziel-punkt', type: 'circle', source: 'ziel', paint: { 'circle-stroke-color': '#ffffff' } });
+    } else {
+      map.getSource('ziel').setData(data);
+    }
+    const st = dotState(sec);
+    const vis = st.vis ? 'visible' : 'none';
+    map.setLayoutProperty('ziel-puls', 'visibility', vis);
+    map.setLayoutProperty('ziel-punkt', 'visibility', vis);
+    if (!st.vis) return;
+    map.setPaintProperty('ziel-puls', 'circle-color', p.color);
+    map.setPaintProperty('ziel-puls', 'circle-radius', st.hr);
+    map.setPaintProperty('ziel-puls', 'circle-opacity', st.ho);
+    map.setPaintProperty('ziel-punkt', 'circle-color', p.color);
+    map.setPaintProperty('ziel-punkt', 'circle-radius', st.r);
+    map.setPaintProperty('ziel-punkt', 'circle-opacity', st.o);
+    map.setPaintProperty('ziel-punkt', 'circle-stroke-width', st.r > 0 ? Math.max(1.5, p.size * 0.22) : 0);
+    map.setPaintProperty('ziel-punkt', 'circle-stroke-opacity', st.o);
+  }
+
+  function updateDotUi() {
+    $('appearCustomRow').hidden = $('appear').value !== 'custom';
+    const warn = $('dotWarn');
+    if (!$('dot').checked) { warn.textContent = 'Punkt ist ausgeschaltet.'; return; }
+    const { total } = timing();
+    const a = appearTime();
+    if (a >= total) warn.textContent = 'Der Punkt erscheint erst nach Videoende. Zeitpunkt vorziehen oder Ziel länger halten.';
+    else if ($('pulse').checked && total - a < dotParams().pop + 0.3) warn.textContent = 'Nach dem Einblenden bleibt kaum Zeit zum Pulsieren. „Ziel halten“ verlängern.';
+    else warn.textContent = '';
+  }
+
+  let firstLoad = true;
+  map.on('style.load', () => {
+    styleReady = true;
+    captureOriginals();
+    applyLabels();
+    renderDot(null);
+    if (firstLoad) {
+      firstLoad = false;
+      fitStage();
+      goTo('start');
+    }
+  });
+
+  // ---------- Start / Ziel ----------
+  function fmtNum(n, d) { return n.toFixed(d).replace('.', ','); }
+  function describe(p) {
+    const ns = p.lat >= 0 ? 'N' : 'S';
+    const ew = p.lng >= 0 ? 'O' : 'W';
+    const base = `${fmtNum(Math.abs(p.lat), 4)} ${ns}, ${fmtNum(Math.abs(p.lng), 4)} ${ew}`;
+    return p.zr === undefined ? base : `${base}, Zoom ${fmtNum(p.zr, 1)}`;
+  }
+  function renderPoints() {
+    $('startInfo').textContent = describe(state.start);
+    $('endInfo').textContent = describe(state.end);
+    $('dotInfo').textContent = describe(state.dot);
+    updateTime(0);
+  }
+  function capture(which) {
+    const c = map.getCenter();
+    state[which] = { lng: c.lng, lat: c.lat, zr: toRef(map.getZoom()) };
+    renderPoints();
+    saveSettings();
+  }
+  function setDot(lng, lat) {
+    state.dot = { lng, lat };
+    if (!$('dot').checked) { $('dot').checked = true; updateDotUi(); }
+    renderPoints();
+    renderDot(null);
+    saveSettings();
+  }
+  function goTo(which) {
+    stopPreview();
+    const p = state[which];
+    map.jumpTo({ center: [p.lng, p.lat], zoom: toZoom(p.zr) });
+  }
+
+  // ---------- Fadenkreuz und Rechtsklick ----------
+  const cross = document.createElement('div');
+  cross.className = 'crosshair';
+  cross.innerHTML = '<span class="h l"></span><span class="h r"></span><span class="v t"></span><span class="v b"></span><span class="c"></span>';
+  const readout = document.createElement('div');
+  readout.className = 'readout';
+  map.getContainer().appendChild(cross);
+  map.getContainer().appendChild(readout);
+
+  function updateReadout() {
+    const c = map.getCenter();
+    readout.textContent = describe({ lat: c.lat, lng: c.lng, zr: toRef(map.getZoom()) });
+  }
+  map.on('move', updateReadout);
+  function toggleCross() { mapEl.classList.toggle('no-cross', !$('cross').checked); }
+
+  map.on('contextmenu', e => {
+    if (exporting) return;
+    if (e.originalEvent) e.originalEvent.preventDefault();
+    stopPreview();
+    setDot(e.lngLat.lng, e.lngLat.lat);
+  });
+
+  // ---------- Kamerakurve ----------
+  const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+  function camAt(t) {
+    const e = ease(Math.min(1, Math.max(0, t)));
+    const z0 = state.start.zr;
+    const z1 = state.end.zr;
+    const z = z0 + (z1 - z0) * e;
+    // Verschiebung proportional zur Bildschirmstrecke, damit Zoom und Schwenk zusammenpassen
+    let s = e;
+    if (Math.abs(z1 - z0) > 0.01) {
+      s = (1 - Math.pow(2, -(z - z0))) / (1 - Math.pow(2, -(z1 - z0)));
+    }
+    const m0 = maplibregl.MercatorCoordinate.fromLngLat([state.start.lng, state.start.lat]);
+    const m1 = maplibregl.MercatorCoordinate.fromLngLat([state.end.lng, state.end.lat]);
+    const mc = new maplibregl.MercatorCoordinate(m0.x + (m1.x - m0.x) * s, m0.y + (m1.y - m0.y) * s, 0);
+    const ll = mc.toLngLat();
+    return { center: [ll.lng, ll.lat], zoom: toZoom(z), bearing: 0, pitch: 0 };
+  }
+
+  function timing() {
+    const hs = Math.max(0, Number($('holdStart').value) || 0);
+    const d = Math.max(0.5, Number($('dur').value) || 4);
+    const he = Math.max(0, Number($('holdEnd').value) || 0);
+    return { hs, d, he, total: hs + d + he };
+  }
+  function updateTime(sec) {
+    const { total } = timing();
+    $('time').textContent = `${fmtNum(sec, 1)} / ${fmtNum(total, 1)} s`;
+    $('progress').style.width = (total ? Math.min(100, (sec / total) * 100) : 0) + '%';
+  }
+
+  // ---------- Vorschau ----------
+  let raf = null;
+  function stopPreview() {
+    if (raf) { cancelAnimationFrame(raf); renderDot(null); }
+    raf = null;
+    $('playBtn').textContent = 'Vorschau abspielen';
+    mapEl.classList.remove('clean');
+  }
+  function playPreview() {
+    if (raf) { stopPreview(); return; }
+    const { hs, d, total } = timing();
+    const t0 = performance.now();
+    $('playBtn').textContent = 'Vorschau stoppen';
+    mapEl.classList.add('clean');
+    const step = now => {
+      const el = (now - t0) / 1000;
+      const t = el < hs ? 0 : Math.min(1, (el - hs) / d);
+      renderDot(Math.min(el, total));
+      map.jumpTo(camAt(t));
+      updateTime(Math.min(el, total));
+      if (el < total) raf = requestAnimationFrame(step);
+      else stopPreview();
+    };
+    raf = requestAnimationFrame(step);
+  }
+
+  // ---------- Export ----------
+  let cancelled = false;
+  let exporting = false;
+
+  function waitIdle(timeout = 20000) {
+    return new Promise(resolve => {
+      let done = false;
+      const finish = () => { if (done) return; done = true; clearTimeout(timer); resolve(); };
+      const timer = setTimeout(finish, timeout);
+      map.once('idle', finish);
+      map.triggerRepaint();
+    });
+  }
+
+  function drawAttribution(ctx, W, H) {
+    const size = Math.round(Math.max(11, W / 150));
+    ctx.font = `500 ${size}px Barlow, "Segoe UI", sans-serif`;
+    const pad = Math.round(size * 0.5);
+    const w = ctx.measureText(ATTRIBUTION).width + pad * 2;
+    const h = size + pad * 1.4;
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillRect(W - w, H - h, w, h);
+    ctx.fillStyle = '#333';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ATTRIBUTION, W - w + pad, H - h / 2);
+  }
+
+  function setLocked(locked) {
+    exporting = locked;
+    mapEl.classList.toggle('locked', locked);
+    mapEl.classList.toggle('clean', locked);
+    document.querySelectorAll('aside select, aside input, aside button, .bar button').forEach(el => {
+      if (el.id === 'cancelBtn') return;
+      el.disabled = locked;
+    });
+    $('cancelBtn').disabled = !locked;
+  }
+
+  function download(blob, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  }
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // Sucht einen H.264-Encoder, den dieser Browser tatsächlich kann
+  async function pickVideoConfig(W, H, fps, bitrate) {
+    if (typeof VideoEncoder === 'undefined') return null;
+    const codecs = ['avc1.640034', 'avc1.640033', 'avc1.64002A', 'avc1.4D4033', 'avc1.42E033'];
+    for (const hw of ['prefer-hardware', 'no-preference', 'prefer-software']) {
+      for (const codec of codecs) {
+        const cfg = { codec, width: W, height: H, bitrate, framerate: fps, avc: { format: 'avc' }, hardwareAcceleration: hw };
+        try {
+          const r = await VideoEncoder.isConfigSupported(cfg);
+          if (r.supported) return cfg;
+        } catch (e) { /* nächste Variante */ }
+      }
+    }
+    return null;
+  }
+
+  function frameSink(kind, W, H, fps) {
+    if (kind === 'mp4') {
+      let muxer, encoder, encErr = null;
+      return {
+        async start() {
+          const bitrate = Math.min(120e6, Math.round(W * H * fps * Number($('quality').value)));
+          const cfg = await pickVideoConfig(W, H, fps, bitrate);
+          if (!cfg) {
+            if (!window.isSecureContext) throw new Error('Videoexport braucht HTTPS. Die Seite läuft über unverschlüsseltes HTTP, daher sperrt der Browser den Encoder. Seite per HTTPS aufrufen oder Bildsequenz wählen');
+            throw new Error('Dein Browser kann hier kein H.264-Video erzeugen. Bitte Bildsequenz wählen');
+          }
+          muxer = new Mp4Muxer.Muxer({
+            target: new Mp4Muxer.ArrayBufferTarget(),
+            video: { codec: 'avc', width: W, height: H, frameRate: fps },
+            fastStart: 'in-memory',
+          });
+          encoder = new VideoEncoder({
+            output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+            error: e => { encErr = e; },
+          });
+          encoder.configure(cfg);
+        },
+        async add(canvas, i) {
+          if (encErr) throw encErr;
+          const frame = new VideoFrame(canvas, { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
+          encoder.encode(frame, { keyFrame: i % fps === 0 });
+          frame.close();
+          while (encoder.encodeQueueSize > 6) await sleep(5);
+        },
+        async finish(setMsg) {
+          setMsg('Video wird abgeschlossen …');
+          await encoder.flush();
+          if (encErr) throw encErr;
+          muxer.finalize();
+          encoder.close();
+          return { blob: new Blob([muxer.target.buffer], { type: 'video/mp4' }), ext: 'mp4' };
+        },
+        abort() { try { encoder && encoder.state !== 'closed' && encoder.close(); } catch (e) { /* egal */ } },
+      };
+    }
+    const png = kind === 'png';
+    const ext = png ? 'png' : 'jpg';
+    const zip = new JSZip();
+    let lastBlob = null;
+    return {
+      async start() {},
+      async add(canvas, i, changed) {
+        if (changed || !lastBlob) lastBlob = await new Promise(r => canvas.toBlob(r, png ? 'image/png' : 'image/jpeg', 0.95));
+        zip.file(`kartenzoom_${String(i + 1).padStart(5, '0')}.${ext}`, lastBlob);
+      },
+      async finish(setMsg) {
+        const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, meta => {
+          setMsg(`ZIP wird gepackt: ${Math.round(meta.percent)} %`);
+        });
+        return { blob, ext: 'zip' };
+      },
+      abort() {},
+    };
+  }
+
+  async function exportFrames() {
+    if (exporting) return;
+    stopPreview();
+    const msg = $('exportMsg');
+    const setMsg = t => { msg.textContent = t; };
+    msg.className = 'msg';
+    const [W, H] = currentRes();
+    const fps = Number($('fps').value);
+    const kind = $('fmt').value;
+    const { hs, d, he } = timing();
+    const n0 = Math.round(hs * fps);
+    const nMove = Math.max(2, Math.round(d * fps));
+    const n1 = Math.round(he * fps);
+    const total = n0 + nMove + n1;
+
+    cancelled = false;
+    setLocked(true);
+    const cssW = mapEl.clientWidth;
+    const out = document.createElement('canvas');
+    out.width = W;
+    out.height = H;
+    const ctx = out.getContext('2d');
+    const sink = frameSink(kind, W, H, fps);
+    let lastKey = null;
+    let ok = false;
+
+    try {
+      await sink.start();
+      map.setPixelRatio(W / cssW);
+      for (let i = 0; i < total; i++) {
+        if (cancelled) break;
+        const t = i < n0 ? 0 : i < n0 + nMove ? (i - n0) / (nMove - 1) : 1;
+        const sec = i / fps;
+        const key = t + '|' + JSON.stringify(dotState(sec));
+        const changed = key !== lastKey;
+        if (changed) {
+          renderDot(sec);
+          map.jumpTo(camAt(t));
+          await waitIdle();
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, W, H);
+          ctx.drawImage(map.getCanvas(), 0, 0, W, H);
+          if ($('attrib').checked) drawAttribution(ctx, W, H);
+        }
+        await sink.add(out, i, changed);
+        lastKey = key;
+        setMsg(`Bild ${i + 1} von ${total} gerendert`);
+        updateTime(sec);
+      }
+      if (cancelled) {
+        setMsg('Export abgebrochen.');
+        return;
+      }
+      const { blob, ext } = await sink.finish(setMsg);
+      download(blob, `kartenzoom_${W}x${H}_${fps}fps.${ext}`);
+      ok = true;
+      const mb = fmtNum(blob.size / 1048576, 1);
+      setMsg(ext === 'mp4'
+        ? `Fertig: ${fmtNum(total / fps, 1)} s Video, ${mb} MB. Direkt in DaVinci importieren.`
+        : `Fertig: ${total} Bilder, ${mb} MB. In DaVinci den entpackten Ordner als Bildsequenz importieren.`);
+    } catch (err) {
+      msg.className = 'msg err';
+      setMsg('Export fehlgeschlagen: ' + (err && err.message ? err.message : err) + '.');
+    } finally {
+      if (!ok) sink.abort();
+      map.setPixelRatio(window.devicePixelRatio || 1);
+      setLocked(false);
+      renderDot(null);
+      goTo('end');
+    }
+  }
+
+  // ---------- Suche ----------
+  async function search() {
+    const q = $('q').value.trim();
+    const msg = $('searchMsg');
+    msg.className = 'msg';
+    if (!q) return;
+    msg.textContent = 'Suche …';
+    try {
+      const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=de&q=' + encodeURIComponent(q));
+      if (!r.ok) throw new Error('Suchdienst antwortet nicht (' + r.status + ')');
+      const res = await r.json();
+      if (!res.length) {
+        msg.className = 'msg err';
+        msg.textContent = `„${q}“ nicht gefunden. Anders schreiben oder Land ergänzen.`;
+        return;
+      }
+      const b = res[0].boundingbox.map(Number); // Süd, Nord, West, Ost
+      stopPreview();
+      map.fitBounds([[b[2], b[0]], [b[3], b[1]]], { padding: 40, maxZoom: 10, duration: 700 });
+      msg.textContent = res[0].display_name.split(',').slice(0, 3).join(',');
+    } catch (err) {
+      msg.className = 'msg err';
+      msg.textContent = 'Suche fehlgeschlagen: ' + err.message;
+    }
+  }
+
+  // ---------- Verdrahtung ----------
+  $('searchBtn').addEventListener('click', search);
+  $('q').addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
+  $('setStart').addEventListener('click', () => capture('start'));
+  $('setEnd').addEventListener('click', () => capture('end'));
+  $('goStart').addEventListener('click', () => goTo('start'));
+  $('goEnd').addEventListener('click', () => goTo('end'));
+  $('setDot').addEventListener('click', () => { const c = map.getCenter(); setDot(c.lng, c.lat); });
+  $('dotToEnd').addEventListener('click', () => setDot(state.end.lng, state.end.lat));
+  $('playBtn').addEventListener('click', playPreview);
+  $('resetBtn').addEventListener('click', () => { goTo('start'); updateTime(0); });
+  $('exportBtn').addEventListener('click', exportFrames);
+  $('cancelBtn').addEventListener('click', () => { cancelled = true; });
+
+  $('style').addEventListener('change', () => {
+    saveSettings();
+    styleReady = false;
+    // diff: false erzwingt ein komplettes Neuladen, sonst feuert 'style.load' nicht
+    map.setStyle(STYLE_URLS[$('style').value], { diff: false });
+  });
+  ['density', 'german', 'hideMinor'].forEach(id => $(id).addEventListener('change', () => { applyLabels(); saveSettings(); }));
+  $('dot').addEventListener('input', () => { renderDot(null); updateDotUi(); saveSettings(); });
+  // Wer den Punkt einstellt, will ihn sehen: Punkt dabei automatisch einschalten
+  ['dotColor', 'dotSize', 'appear', 'popDur', 'appearAt', 'pulse', 'pulsePeriod', 'pulseScale', 'pulseStrength']
+    .forEach(id => $(id).addEventListener('input', () => {
+      if (!$('dot').checked) $('dot').checked = true;
+      renderDot(null); updateDotUi(); saveSettings();
+    }));
+  $('res').addEventListener('change', () => { toggleCustom(); fitStage(); saveSettings(); });
+  ['cw', 'ch'].forEach(id => $(id).addEventListener('change', () => { fitStage(); saveSettings(); }));
+  ['fps', 'fmt', 'attrib'].forEach(id => $(id).addEventListener('change', saveSettings));
+  ['holdStart', 'dur', 'holdEnd'].forEach(id => $(id).addEventListener('input', () => { updateTime(0); updateDotUi(); saveSettings(); }));
+  window.addEventListener('resize', () => { if (!exporting) fitStage(); });
+
+  map.on('error', e => {
+    const m = e && e.error && e.error.message;
+    if (m && /Failed to fetch|NetworkError/i.test(m)) {
+      $('exportMsg').className = 'msg err';
+      $('exportMsg').textContent = 'Kartendaten konnten nicht geladen werden. Internetverbindung, Pi-hole oder Browser-Shields prüfen (tiles.openfreemap.org).';
+    }
+  });
+
+  $('cross').addEventListener('change', () => { toggleCross(); saveSettings(); });
+  const toggleQuality = () => { $('qualityRow').hidden = $('fmt').value !== 'mp4'; };
+  $('fmt').addEventListener('change', toggleQuality);
+  $('quality').addEventListener('change', saveSettings);
+  toggleQuality();
+  toggleCross();
+  toggleCustom();
+  updateDotUi();
+  fitStage();
+  renderPoints();
+  updateReadout();
+})();
+</script>
+</body>
+</html>
