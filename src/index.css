@@ -1,6 +1,17 @@
 :root {
+  --paper: #e6ebee;
+  --panel: #f4f6f7;
+  --ink: #1d2b33;
+  --muted: #6b7c86;
+  --line: #c9d3d9;
+  --accent: #2f6bff;
+  --accent-ink: #ffffff;
+  --warn: #b4442e;
+  --font: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-head: var(--font);
+
   color-scheme: light dark;
-  font: 14px/1.4 system-ui, 'Segoe UI', Roboto, sans-serif;
+  font: 14px/1.4 var(--font);
 }
 
 *,
@@ -14,4 +25,9 @@ body,
 #root {
   height: 100%;
   margin: 0;
+}
+
+body {
+  color: var(--ink);
+  background: var(--paper);
 }

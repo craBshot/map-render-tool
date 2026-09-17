@@ -42,6 +42,7 @@ export function MapStage() {
       },
     })
     controllerRef.current = controller
+    useEditorStore.getState().setController(controller)
     controller.applyCameraFrame(camAt(initialProject.camera, 0))
 
     const updateReadout = () => {
@@ -70,6 +71,7 @@ export function MapStage() {
       controller.map.off('contextmenu', handleContextMenu)
       controller.destroy()
       controllerRef.current = null
+      useEditorStore.getState().setController(null)
     }
   }, [])
 
