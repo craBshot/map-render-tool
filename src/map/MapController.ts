@@ -1,8 +1,9 @@
 import maplibregl from 'maplibre-gl'
+import type { AreaFrame } from './areaAnimation'
 import type { CameraFrame } from './camera'
 import { applyLabelSettings, captureOriginalLayers, type OriginalLayerInfo } from './labels'
 import type { MarkerFrame } from './markerAnimation'
-import type { MarkerObject, StyleId, StyleState } from '../state/types'
+import type { AreaObject, AreaStyle, MarkerObject, StyleId, StyleState } from '../state/types'
 
 export const STYLE_URLS: Record<StyleId, string> = {
   positron: 'https://tiles.openfreemap.org/styles/positron',
@@ -26,6 +27,12 @@ const GERMAN_LOCALE = {
 export interface RenderedMarker {
   marker: MarkerObject
   frame: MarkerFrame
+}
+
+export interface RenderedArea {
+  area: AreaObject
+  style: AreaStyle | null
+  frame: AreaFrame
 }
 
 export interface MapControllerOptions {
@@ -113,14 +120,40 @@ export class MapController {
     for (const { marker, frame } of markers) this.renderMarker(marker, frame)
   }
 
+  renderAreas(areas: RenderedArea[]): void {
+    for (const { area, style, frame } of areas) this.renderArea(area, style, frame)
+  }
+
+  /** Finds the first marker layer, if any, so new area layers can be inserted below it. */
+  private firstMarkerLayerId(): string | undefined {
+    return this.map.getStyle()?.layers.find((l) => l.id.endsWith('-halo') && l.id.startsWith('marker-'))?.id
+  }
+
+  /** Reorders area layer pairs to match orderedIds (list order = stacking order), always below markers. */
+  reorderAreaLayers(orderedIds: string[]): void {
+    if (!this.styleReady) return
+    const anchor = this.firstMarkerLayerId()
+    // Walk bottom-to-top so each moveLayer (which inserts just before anchor)
+    // leaves the top-of-list item closest to the anchor.
+    for (let i = orderedIds.length - 1; i >= 0; i--) {
+      const sourceId = `area-${orderedIds[i]}`
+      if (!this.map.getSource(sourceId)) continue
+      this.map.moveLayer(`${sourceId}-fill`, anchor)
+      this.map.moveLayer(`${sourceId}-line`, anchor)
+    }
+  }
+
   /**
-   * Applies a precomputed camera + marker frame together — the one path
-   * playback and export both go through. Free editing (camera driven by
-   * the user's own pan/zoom) calls applyCameraFrame()/renderMarkers()
-   * separately instead, so setting a marker doesn't snap the camera back.
+   * Applies a precomputed camera + marker + area frame together — the one
+   * path playback and export both go through. Free editing (camera driven
+   * by the user's own pan/zoom) calls applyCameraFrame()/renderMarkers()/
+   * renderAreas() separately instead, so editing an object doesn't snap the
+   * camera back. Areas render before markers so a filled area can never
+   * obscure the target marker.
    */
-  applyFrame(cameraFrame: CameraFrame, markers: RenderedMarker[]): void {
+  applyFrame(cameraFrame: CameraFrame, markers: RenderedMarker[], areas: RenderedArea[] = []): void {
     this.applyCameraFrame(cameraFrame)
+    this.renderAreas(areas)
     this.renderMarkers(markers)
   }
 
@@ -167,6 +200,37 @@ export class MapController {
     this.map.setPaintProperty(dotLayerId, 'circle-opacity', frame.opacity)
     this.map.setPaintProperty(dotLayerId, 'circle-stroke-width', frame.radius > 0 ? Math.max(1.5, marker.sizePx * 0.22) : 0)
     this.map.setPaintProperty(dotLayerId, 'circle-stroke-opacity', frame.opacity)
+  }
+
+  private renderArea(area: AreaObject, style: AreaStyle | null, frame: AreaFrame): void {
+    if (!this.styleReady) return
+    const sourceId = `area-${area.id}`
+    const fillLayerId = `${sourceId}-fill`
+    const lineLayerId = `${sourceId}-line`
+    const data = { type: 'Feature' as const, properties: {}, geometry: area.geometry }
+
+    const source = this.map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined
+    if (!source) {
+      const beforeId = this.firstMarkerLayerId()
+      this.map.addSource(sourceId, { type: 'geojson', data })
+      this.map.addLayer({ id: fillLayerId, type: 'fill', source: sourceId, paint: {} }, beforeId)
+      this.map.addLayer({ id: lineLayerId, type: 'line', source: sourceId, paint: {} }, beforeId)
+    } else {
+      source.setData(data)
+    }
+
+    const visible = frame.visible && area.visible && style !== null
+    const visibility = visible ? 'visible' : 'none'
+    this.map.setLayoutProperty(fillLayerId, 'visibility', visibility)
+    this.map.setLayoutProperty(lineLayerId, 'visibility', visibility)
+    if (!visible || !style) return
+
+    this.map.setPaintProperty(fillLayerId, 'fill-color', style.fill.color)
+    this.map.setPaintProperty(fillLayerId, 'fill-opacity', style.fill.enabled ? style.fill.opacity * frame.opacity : 0)
+    this.map.setPaintProperty(lineLayerId, 'line-color', style.outline.color)
+    this.map.setPaintProperty(lineLayerId, 'line-width', style.outline.enabled ? style.outline.widthPx : 0)
+    this.map.setPaintProperty(lineLayerId, 'line-opacity', style.outline.enabled ? frame.opacity : 0)
+    this.map.setPaintProperty(lineLayerId, 'line-dasharray', style.outline.dashed ? [2, 2] : undefined)
   }
 
   /** Set export resolution via pixel ratio, not container size, so framing matches the preview. */
