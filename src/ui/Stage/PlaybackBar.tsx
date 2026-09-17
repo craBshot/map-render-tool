@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react'
+import { areaStateAt } from '../../map/areaAnimation'
 import { camAt } from '../../map/camera'
 import { markerStateAt } from '../../map/markerAnimation'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
+import { resolveAreaStyle } from '../../state/types'
 import { timingTotals, zoomProgressAt } from '../../timeline/timing'
 import { strings } from '../../i18n'
 import { fmtNum } from '../format'
@@ -27,6 +29,10 @@ export function PlaybackBar() {
     controller.applyFrame(
       camAt(project.camera, t),
       project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, projectTotals, sec) })),
+      project.areas.map((area) => {
+        const style = resolveAreaStyle(area.styleId, project.areaStyles)
+        return { area, style, frame: areaStateAt(style, projectTotals, sec) }
+      }),
     )
   }
 
@@ -34,13 +40,19 @@ export function PlaybackBar() {
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
     rafRef.current = null
     useEditorStore.getState().setPlaying(false)
-    // Marker goes back to its static editor state; the camera is left
+    // Marker/area go back to their static editor state; the camera is left
     // wherever playback stopped it, matching legacy (only "Zum Start" jumps).
     const controller = useEditorStore.getState().controller
     if (!controller) return
     const project = useProjectStore.getState().project
     const projectTotals = timingTotals(project.camera.timing)
     controller.renderMarkers(project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, projectTotals, null) })))
+    controller.renderAreas(
+      project.areas.map((area) => {
+        const style = resolveAreaStyle(area.styleId, project.areaStyles)
+        return { area, style, frame: areaStateAt(style, projectTotals, null) }
+      }),
+    )
   }
 
   function play() {

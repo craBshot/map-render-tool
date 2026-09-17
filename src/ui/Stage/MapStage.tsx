@@ -1,12 +1,13 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { MapMouseEvent } from 'maplibre-gl'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { areaStateAt } from '../../map/areaAnimation'
 import { camAt } from '../../map/camera'
 import { MapController } from '../../map/MapController'
 import { markerStateAt } from '../../map/markerAnimation'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
-import { createDefaultMarker } from '../../state/types'
+import { createDefaultMarker, resolveAreaStyle } from '../../state/types'
 import { timingTotals } from '../../timeline/timing'
 import { Crosshair } from './Crosshair'
 import { Readout } from './Readout'
@@ -57,9 +58,17 @@ export function MapStage() {
       onStyleReady: () => {
         const current = useProjectStore.getState().project
         const totals = timingTotals(current.camera.timing)
+        controller.renderAreas(
+          current.areas.map((area) => ({
+            area,
+            style: resolveAreaStyle(area.styleId, current.areaStyles),
+            frame: areaStateAt(resolveAreaStyle(area.styleId, current.areaStyles), totals, null),
+          })),
+        )
         controller.renderMarkers(
           current.markers.map((marker) => ({ marker, frame: markerStateAt(marker, totals, null) })),
         )
+        controller.reorderAreaLayers(current.areas.map((a) => a.id))
       },
     })
     controllerRef.current = controller
@@ -79,6 +88,12 @@ export function MapStage() {
       if (useEditorStore.getState().locked) return
       e.originalEvent?.preventDefault()
       const { lng, lat } = e.lngLat
+
+      if (useEditorStore.getState().pointInteractionMode === 'area') {
+        useEditorStore.getState().setPendingAreaPick({ lng, lat })
+        return
+      }
+
       useProjectStore.getState().setProject((p) => ({
         ...p,
         markers:
@@ -136,6 +151,21 @@ export function MapStage() {
       project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, totals, null) })),
     )
   }, [project.markers, project.camera.timing])
+
+  // Area content/appearance/order — same static (sec=null) editor treatment as markers.
+  useEffect(() => {
+    const controller = controllerRef.current
+    if (!controller) return
+    const totals = timingTotals(project.camera.timing)
+    controller.renderAreas(
+      project.areas.map((area) => ({
+        area,
+        style: resolveAreaStyle(area.styleId, project.areaStyles),
+        frame: areaStateAt(resolveAreaStyle(area.styleId, project.areaStyles), totals, null),
+      })),
+    )
+    controller.reorderAreaLayers(project.areas.map((a) => a.id))
+  }, [project.areas, project.areaStyles, project.camera.timing])
 
   return (
     <div ref={stageRef} className={styles.stage}>
