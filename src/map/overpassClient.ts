@@ -3,9 +3,20 @@ import { overpassElementToPolygon, type OverpassElement } from './overpassGeomet
 
 export const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter'
 
-/** POSTs an Overpass QL query and returns its `elements`. Shared by the on-demand pick flow and the worker's enumeration step. */
+/**
+ * POSTs an Overpass QL query and returns its `elements`. Shared by the
+ * on-demand pick flow and the worker's enumeration step.
+ *
+ * The explicit User-Agent matters: Overpass returns 406 for Node's default
+ * `User-Agent: node` (undici) — real browsers already send an identifying
+ * one, so this only ever changes behavior for the worker's own requests.
+ */
 export async function postOverpassQuery<T>(query: string): Promise<T[]> {
-  const res = await fetch(OVERPASS_ENDPOINT, { method: 'POST', body: `data=${encodeURIComponent(query)}` })
+  const res = await fetch(OVERPASS_ENDPOINT, {
+    method: 'POST',
+    headers: { 'User-Agent': 'Map_Render_Tool/1.0 (private single-user tool; see project CLAUDE.md)' },
+    body: `data=${encodeURIComponent(query)}`,
+  })
   if (!res.ok) throw new Error(`Overpass antwortet nicht (${res.status})`)
   const data = (await res.json()) as { elements: T[] }
   return data.elements
