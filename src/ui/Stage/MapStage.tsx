@@ -13,6 +13,7 @@ import { createDefaultMarker, createDefaultRoute, resolveAreaStyle } from '../..
 import { timingTotals } from '../../timeline/timing'
 import { Crosshair } from './Crosshair'
 import { Readout } from './Readout'
+import { RouteWaypointMarkers } from './RouteWaypointMarkers'
 import styles from './MapStage.module.css'
 
 declare global {
@@ -199,6 +200,7 @@ export function MapStage() {
       <div ref={containerRef} className={styles.map} data-locked={locked || undefined}>
         <Crosshair />
         {readout && <Readout lng={readout.lng} lat={readout.lat} zr={readout.zr} />}
+        <RouteWaypointMarkers />
       </div>
     </div>
   )

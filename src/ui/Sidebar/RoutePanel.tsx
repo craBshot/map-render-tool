@@ -5,7 +5,7 @@ import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
 import type { RouteObject, RoutingMode, RouteWaypoint } from '../../state/types'
 import { strings } from '../../i18n'
-import { describePoint, fmtNum } from '../format'
+import { describePoint, fmtNum, waypointLetter } from '../format'
 import styles from './panel.module.css'
 
 const APPEAR_MODES: RouteObject['appear']['mode'][] = ['start', 'zoomStart', 'zoomEnd', 'custom']
@@ -103,7 +103,9 @@ export function RoutePanel() {
               {route.waypoints.map((wp, index) => (
                 <div key={index} className={styles.cardHeader}>
                   <div>
-                    <span>{waypointLabel(index, route.waypoints.length)}</span>
+                    <span>
+                      {waypointLetter(index)} — {waypointLabel(index, route.waypoints.length)}
+                    </span>
                     <div className={styles.coords}>{describePoint(wp.lng, wp.lat)}</div>
                   </div>
                   <div className={styles.btns}>
