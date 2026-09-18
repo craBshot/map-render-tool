@@ -2,15 +2,15 @@ import { execFile } from 'node:child_process'
 import { statSync } from 'node:fs'
 import { promisify } from 'node:util'
 import { expect, test } from '@playwright/test'
-import { mockExternalServices } from './fixtures/routeMocks'
+import { mockExternalServices, type MockExternalServicesOptions } from './fixtures/routeMocks'
 
 const execFileAsync = promisify(execFile)
 
-async function gotoApp(page: import('@playwright/test').Page) {
+async function gotoApp(page: import('@playwright/test').Page, options: MockExternalServicesOptions = {}) {
   await page.addInitScript(() => {
     window.__E2E__ = true
   })
-  await mockExternalServices(page)
+  await mockExternalServices(page, options)
   await page.goto('/')
   await page.locator('canvas.maplibregl-canvas').waitFor()
 }
@@ -84,6 +84,27 @@ test('area pick queries Overpass, adds the area, and it survives a style change'
   await page.selectOption('#mapStyle', 'dark')
   await page.waitForTimeout(300)
   await expect.poll(() => isAreaVisible(page)).toBe(true)
+})
+
+test('area pick hits the local database and never calls live Overpass', async ({ page }) => {
+  const overpassRequests: string[] = []
+  page.on('request', (req) => {
+    if (req.url().includes('overpass-api.de')) overpassRequests.push(req.url())
+  })
+
+  await gotoApp(page, { localAreaHit: true })
+
+  await page.getByRole('radio', { name: 'Gebiet abfragen' }).click()
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
+
+  const candidate = page.getByText('Testgebiet — Schutzgebiet (lokale Datenbank)')
+  await expect(candidate).toBeVisible()
+
+  await candidate.click()
+  await page.getByRole('button', { name: 'Ausgewählte hinzufügen' }).click()
+  await expect.poll(() => isAreaVisible(page)).toBe(true)
+
+  expect(overpassRequests).toEqual([])
 })
 
 test('preview runs and advances the time readout', async ({ page }) => {

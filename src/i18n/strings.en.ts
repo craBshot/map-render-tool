@@ -78,6 +78,7 @@ export const en: typeof de = {
     searching: 'Looking up areas …',
     noneFound: 'No areas found at this point (or every type is hidden — see settings).',
     addSelected: 'Add selected',
+    localSource: '(local database)',
     noStyle: 'None',
     visible: 'Visible',
     moveUp: 'Move up',

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchAreaGeometry, findAreaCandidates, type OverpassCandidate } from '../../map/overpassClient'
+import { findAreaCandidatesWithFallback, resolveAreaGeometry, type AreaLookupCandidate } from '../../map/areaLookup'
 import { useEditorStore } from '../../state/editorStore'
 import { useSettingsStore } from '../../state/settingsStore'
 import { useProjectStore } from '../../state/store'
@@ -7,7 +7,7 @@ import { createDefaultArea, type AreaObject } from '../../state/types'
 import { strings } from '../../i18n'
 import styles from './panel.module.css'
 
-function candidateKey(c: OverpassCandidate): string {
+function candidateKey(c: AreaLookupCandidate): string {
   return `${c.osmType}/${c.osmId}`
 }
 
@@ -20,7 +20,7 @@ export function AreaListPanel() {
   const enabledTypes = useSettingsStore((s) => s.areaCandidateTypes)
   const t = strings.area
 
-  const [candidates, setCandidates] = useState<OverpassCandidate[] | null>(null)
+  const [candidates, setCandidates] = useState<AreaLookupCandidate[] | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -33,7 +33,7 @@ export function AreaListPanel() {
     setCandidates(null)
     setSelected(new Set())
 
-    findAreaCandidates(pendingAreaPick.lng, pendingAreaPick.lat, enabledTypes)
+    findAreaCandidatesWithFallback(pendingAreaPick.lng, pendingAreaPick.lat, enabledTypes)
       .then((found) => {
         if (!cancelled) setCandidates(found)
       })
@@ -69,7 +69,7 @@ export function AreaListPanel() {
 
     for (const candidate of chosen) {
       try {
-        const geometry = await fetchAreaGeometry(candidate)
+        const geometry = await resolveAreaGeometry(candidate)
         const area = createDefaultArea(
           geometry,
           candidate.name,
@@ -121,7 +121,7 @@ export function AreaListPanel() {
                   return (
                     <label key={key} className={styles.check}>
                       <input type="checkbox" checked={selected.has(key)} onChange={() => toggleSelected(key)} />
-                      {c.name} — {t.kinds[c.kind]}
+                      {c.name} — {t.kinds[c.kind]} {c.source === 'local' && t.localSource}
                     </label>
                   )
                 })}

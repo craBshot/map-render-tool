@@ -73,6 +73,7 @@ export const de = {
     searching: 'Suche Gebiete …',
     noneFound: 'Keine Gebiete an diesem Punkt gefunden (oder alle Typen ausgeblendet — siehe Einstellungen).',
     addSelected: 'Ausgewählte hinzufügen',
+    localSource: '(lokale Datenbank)',
     noStyle: 'Keine',
     visible: 'Sichtbar',
     moveUp: 'Nach oben',

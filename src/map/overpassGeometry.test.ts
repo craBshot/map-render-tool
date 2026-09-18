@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GeometryAssemblyError, overpassElementToPolygon } from './overpassGeometry'
+import { GeometryAssemblyError, overpassElementToPolygon, polygonContainsPoint } from './overpassGeometry'
 import { danglingRelation, naturparkWildeshauserGeestWay, squareWithHoleRelation } from './overpassGeometry.fixtures'
 
 describe('overpassElementToPolygon', () => {
@@ -51,5 +51,34 @@ describe('overpassElementToPolygon', () => {
     expect(() =>
       overpassElementToPolygon({ type: 'relation', id: 1, members: [{ type: 'node', ref: 1, role: 'label' }] }),
     ).toThrow(GeometryAssemblyError)
+  })
+})
+
+describe('polygonContainsPoint', () => {
+  const squareWithHole = overpassElementToPolygon(squareWithHoleRelation)
+
+  it('is true for a point inside the outer ring and outside the hole', () => {
+    expect(polygonContainsPoint(squareWithHole, [1, 1])).toBe(true)
+  })
+
+  it('is false for a point inside the hole', () => {
+    expect(polygonContainsPoint(squareWithHole, [5, 5])).toBe(false)
+  })
+
+  it('is false for a point outside the outer ring', () => {
+    expect(polygonContainsPoint(squareWithHole, [20, 20])).toBe(false)
+  })
+
+  it('works for a MultiPolygon, matching only the containing part', () => {
+    const multi: GeoJSON.MultiPolygon = {
+      type: 'MultiPolygon',
+      coordinates: [
+        [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]],
+        [[[10, 10], [11, 10], [11, 11], [10, 11], [10, 10]]],
+      ],
+    }
+    expect(polygonContainsPoint(multi, [0.5, 0.5])).toBe(true)
+    expect(polygonContainsPoint(multi, [10.5, 10.5])).toBe(true)
+    expect(polygonContainsPoint(multi, [5, 5])).toBe(false)
   })
 })

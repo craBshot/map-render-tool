@@ -45,7 +45,37 @@ const MOCK_OVERPASS_GEOMETRY = {
   ],
 }
 
-export async function mockExternalServices(page: Page): Promise<void> {
+// What the local area-db worker's /area-db/candidates would return for a hit —
+// geometry included inline, unlike the two-step live Overpass path.
+const MOCK_LOCAL_AREA_HIT = {
+  areas: [
+    {
+      osmType: 'way',
+      osmId: 42,
+      name: 'Testgebiet',
+      kind: 'protected_area',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [9, 50],
+            [9.01, 50],
+            [9.01, 50.01],
+            [9, 50.01],
+            [9, 50],
+          ],
+        ],
+      },
+    },
+  ],
+}
+
+export interface MockExternalServicesOptions {
+  /** true = /area-db/candidates returns a hit; false (default) = empty, so the live Overpass path is exercised. */
+  localAreaHit?: boolean
+}
+
+export async function mockExternalServices(page: Page, options: MockExternalServicesOptions = {}): Promise<void> {
   await page.route('**/tiles.openfreemap.org/**', (route) =>
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(MOCK_STYLE) }),
   )
@@ -58,5 +88,9 @@ export async function mockExternalServices(page: Page): Promise<void> {
     const body = decodeURIComponent(route.request().postData() ?? '')
     const mock = body.includes('out geom') ? MOCK_OVERPASS_GEOMETRY : MOCK_OVERPASS_CANDIDATES
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(mock) })
+  })
+  await page.route('**/area-db/**', (route) => {
+    const body = options.localAreaHit ? MOCK_LOCAL_AREA_HIT : { areas: [] }
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) })
   })
 }

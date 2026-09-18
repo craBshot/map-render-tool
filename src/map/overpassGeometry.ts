@@ -140,3 +140,18 @@ export function overpassElementToPolygon(element: OverpassElement): GeoJSON.Poly
     ? { type: 'Polygon', coordinates: polygonRings[0] }
     : { type: 'MultiPolygon', coordinates: polygonRings }
 }
+
+/** True if `point` lies inside `geometry`, respecting holes. Used by the area-db worker's spatial index. */
+export function polygonContainsPoint(
+  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon,
+  point: GeoJSON.Position,
+): boolean {
+  const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
+  for (const rings of polygons) {
+    const [outer, ...holes] = rings
+    if (!ringContainsPoint(outer, point)) continue
+    if (holes.some((hole) => ringContainsPoint(hole, point))) continue
+    return true
+  }
+  return false
+}
