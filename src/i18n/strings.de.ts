@@ -116,7 +116,7 @@ export const de = {
   },
   route: {
     heading: 'Route',
-    pickHint: 'Rechtsklick im Routen-Modus fügt Wegpunkte an — erster Klick ist der Start, jeder weitere Klick verlängert die Route und wird der neue Zielpunkt.',
+    pickHint: 'Rechtsklick im Routen-Modus fügt Wegpunkte an — erster Klick ist der Start, zweiter Klick das Ziel, jeder weitere Klick fügt sich als Zwischenstopp davor ein.',
     waypointStart: 'Start',
     waypointDestination: 'Ziel',
     waypointVia: (n: number) => `Zwischenstopp ${n}`,
@@ -127,12 +127,6 @@ export const de = {
     routingModes: {
       osrm: 'Straßenroute (OSRM)',
       straight: 'Luftlinie',
-    },
-    profile: 'Profil',
-    profiles: {
-      driving: 'Auto',
-      walking: 'Fuß',
-      cycling: 'Fahrrad',
     },
     calculate: 'Route berechnen',
     calculating: 'Route wird berechnet …',
@@ -146,7 +140,7 @@ export const de = {
       instant: 'Komplett einblenden',
       progressive: 'Zeichnen',
     },
-    speed: 'Tempo (km/h)',
+    drawDuration: 'Zeichendauer (s)',
     appear: 'Erscheint',
     appearAt: 'Zeitpunkt (s)',
     deleteRoute: 'Route löschen',

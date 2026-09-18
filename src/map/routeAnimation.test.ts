@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { routeStateAt } from './routeAnimation'
-import { totalLineLengthMeters } from './routeGeometry'
 import type { RouteObject } from '../state/types'
 import type { TimingTotals } from '../timeline/timing'
 
@@ -23,7 +22,6 @@ function route(overrides: Partial<RouteObject> = {}): RouteObject {
       { lng: 0, lat: 2 },
     ],
     routingMode: 'osrm',
-    profile: 'driving',
     geometry,
     osrmDurationSec: null,
     color: '#e6572f',
@@ -31,7 +29,7 @@ function route(overrides: Partial<RouteObject> = {}): RouteObject {
     visible: true,
     appear: { mode: 'custom', atSec: 1 },
     reveal: 'progressive',
-    drawSpeedKmh: 80,
+    drawDurationSec: 4,
     ...overrides,
   }
 }
@@ -64,19 +62,15 @@ describe('routeStateAt', () => {
     expect(routeStateAt(r, timing, 100)).toEqual({ visible: true, fraction: 1 })
   })
 
-  it('reveal "progressive" derives the draw duration from length/speed, not a fixed number', () => {
-    const r = route({ reveal: 'progressive', drawSpeedKmh: 80 })
-    const totalKm = totalLineLengthMeters(geometry.coordinates) / 1000
-    const durationSec = (totalKm / 80) * 3600
-    const appearAt = 1
-    const midSec = appearAt + durationSec / 2
-
-    const state = routeStateAt(r, timing, midSec)
+  it('reveal "progressive" advances linearly over the fixed drawDurationSec', () => {
+    const r = route({ reveal: 'progressive', drawDurationSec: 4 })
+    // appearAt=1, drawDurationSec=4 -> fraction=0.5 at sec=3
+    const state = routeStateAt(r, timing, 3)
     expect(state.visible).toBe(true)
     expect(state.fraction).toBeCloseTo(0.5, 6)
   })
 
-  it('a longer route takes proportionally longer to draw at the same speed', () => {
+  it("two routes of different length draw over the same fixed duration, independent of their length", () => {
     const shortGeometry: GeoJSON.LineString = {
       type: 'LineString',
       coordinates: [
@@ -91,19 +85,18 @@ describe('routeStateAt', () => {
         [0, 4],
       ],
     }
-    const secAfterAppear = 50
-    const shortState = routeStateAt(route({ geometry: shortGeometry, drawSpeedKmh: 80 }), timing, 1 + secAfterAppear)
-    const longState = routeStateAt(route({ geometry: longGeometry, drawSpeedKmh: 80 }), timing, 1 + secAfterAppear)
-    expect(longState.fraction).toBeLessThan(shortState.fraction)
+    const shortState = routeStateAt(route({ geometry: shortGeometry, drawDurationSec: 4 }), timing, 3)
+    const longState = routeStateAt(route({ geometry: longGeometry, drawDurationSec: 4 }), timing, 3)
+    expect(longState.fraction).toBeCloseTo(shortState.fraction, 6)
   })
 
   it('clamps fraction to 1 once the draw duration has fully elapsed', () => {
-    const r = route({ reveal: 'progressive', drawSpeedKmh: 80 })
+    const r = route({ reveal: 'progressive', drawDurationSec: 4 })
     expect(routeStateAt(r, timing, 100000)).toEqual({ visible: true, fraction: 1 })
   })
 
-  it('treats a non-positive draw speed as an instant reveal (avoids division by zero)', () => {
-    const r = route({ reveal: 'progressive', drawSpeedKmh: 0 })
+  it('treats a non-positive draw duration as an instant reveal (avoids division by zero)', () => {
+    const r = route({ reveal: 'progressive', drawDurationSec: 0 })
     expect(routeStateAt(r, timing, 1)).toEqual({ visible: true, fraction: 1 })
   })
 

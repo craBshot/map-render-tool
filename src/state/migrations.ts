@@ -22,6 +22,20 @@ const migrations: Record<number, Migration> = {
     version: 3,
     route: null,
   }),
+  // v3 -> v4: dropped the route profile (driving/walking/cycling made no
+  // difference on the public OSRM demo server — verified live), and
+  // switched the progressive draw from a simulated speed (km/h) to a fixed
+  // duration in seconds.
+  3: (data) => {
+    const d = data as { route: Record<string, unknown> | null }
+    let route: Record<string, unknown> | null = null
+    if (d.route) {
+      route = { ...d.route, drawDurationSec: 3 }
+      delete route.profile
+      delete route.drawSpeedKmh
+    }
+    return { ...(data as object), version: 4, route }
+  },
 }
 
 export class UnsupportedProjectVersionError extends Error {

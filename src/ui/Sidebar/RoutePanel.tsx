@@ -3,14 +3,13 @@ import { fetchRoute } from '../../map/osrmClient'
 import { totalLineLengthMeters, waypointsToStraightLine } from '../../map/routeGeometry'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
-import type { RouteObject, RouteProfile, RoutingMode, RouteWaypoint } from '../../state/types'
+import type { RouteObject, RoutingMode, RouteWaypoint } from '../../state/types'
 import { strings } from '../../i18n'
-import { fmtNum } from '../format'
+import { describePoint, fmtNum } from '../format'
 import styles from './panel.module.css'
 
 const APPEAR_MODES: RouteObject['appear']['mode'][] = ['start', 'zoomStart', 'zoomEnd', 'custom']
 const ROUTING_MODES: RoutingMode[] = ['osrm', 'straight']
-const PROFILES: RouteProfile[] = ['driving', 'walking', 'cycling']
 const REVEAL_MODES: RouteObject['reveal'][] = ['instant', 'progressive']
 
 function formatHoursMinutes(totalSec: number): string {
@@ -70,7 +69,7 @@ export function RoutePanel() {
     setCalculating(true)
     setError('')
     try {
-      const result = await fetchRoute(route.waypoints, route.profile)
+      const result = await fetchRoute(route.waypoints)
       updateRoute((r) => ({ ...r, geometry: result.geometry, osrmDurationSec: result.durationSec }))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -101,9 +100,12 @@ export function RoutePanel() {
         {route && (
           <>
             <div className={styles.card}>
-              {route.waypoints.map((_, index) => (
+              {route.waypoints.map((wp, index) => (
                 <div key={index} className={styles.cardHeader}>
-                  <span>{waypointLabel(index, route.waypoints.length)}</span>
+                  <div>
+                    <span>{waypointLabel(index, route.waypoints.length)}</span>
+                    <div className={styles.coords}>{describePoint(wp.lng, wp.lat)}</div>
+                  </div>
                   <div className={styles.btns}>
                     <button
                       type="button"
@@ -153,18 +155,6 @@ export function RoutePanel() {
 
             {route.routingMode === 'osrm' && (
               <>
-                <label className={styles.label}>{t.profile}</label>
-                <select
-                  className={styles.select}
-                  value={route.profile}
-                  onChange={(e) => updateRoute((r) => ({ ...r, profile: e.target.value as RouteProfile }))}
-                >
-                  {PROFILES.map((profile) => (
-                    <option key={profile} value={profile}>
-                      {t.profiles[profile]}
-                    </option>
-                  ))}
-                </select>
                 <div className={styles.btns}>
                   <button
                     type="button"
@@ -237,14 +227,14 @@ export function RoutePanel() {
             </div>
             {route.reveal === 'progressive' && (
               <div>
-                <label className={styles.label}>{t.speed}</label>
+                <label className={styles.label}>{t.drawDuration}</label>
                 <input
                   type="number"
                   className={styles.input}
-                  min={1}
-                  step={5}
-                  value={route.drawSpeedKmh}
-                  onChange={(e) => updateRoute((r) => ({ ...r, drawSpeedKmh: Math.max(1, Number(e.target.value)) }))}
+                  min={0}
+                  step={0.1}
+                  value={route.drawDurationSec}
+                  onChange={(e) => updateRoute((r) => ({ ...r, drawDurationSec: Math.max(0, Number(e.target.value)) }))}
                 />
               </div>
             )}

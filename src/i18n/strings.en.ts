@@ -121,7 +121,7 @@ export const en: typeof de = {
   },
   route: {
     heading: 'Route',
-    pickHint: 'Right-click in route mode appends a waypoint — the first click is the start, every further click extends the route and becomes the new destination.',
+    pickHint: 'Right-click in route mode appends a waypoint — the first click is the start, the second is the destination, every further click inserts a via-point just before it.',
     waypointStart: 'Start',
     waypointDestination: 'Destination',
     waypointVia: (n: number) => `Via ${n}`,
@@ -132,12 +132,6 @@ export const en: typeof de = {
     routingModes: {
       osrm: 'Street route (OSRM)',
       straight: 'Straight line',
-    },
-    profile: 'Profile',
-    profiles: {
-      driving: 'Driving',
-      walking: 'Walking',
-      cycling: 'Cycling',
     },
     calculate: 'Calculate route',
     calculating: 'Calculating route …',
@@ -151,7 +145,7 @@ export const en: typeof de = {
       instant: 'Show fully',
       progressive: 'Draw progressively',
     },
-    speed: 'Speed (km/h)',
+    drawDuration: 'Draw duration (s)',
     appear: 'Appears',
     appearAt: 'Time (s)',
     deleteRoute: 'Delete route',

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   haversineDistanceMeters,
+  insertRouteWaypoint,
   sliceLineByFraction,
   totalLineLengthMeters,
   waypointsToStraightLine,
@@ -83,5 +84,28 @@ describe('waypointsToStraightLine', () => {
         [11.6, 48.1],
       ],
     })
+  })
+})
+
+describe('insertRouteWaypoint', () => {
+  const a = { lng: 0, lat: 0 }
+  const b = { lng: 1, lat: 1 }
+  const c = { lng: 2, lat: 2 }
+  const d = { lng: 3, lat: 3 }
+
+  it('appends the first click as the start (0 -> 1)', () => {
+    expect(insertRouteWaypoint([], a)).toEqual([a])
+  })
+
+  it('appends the second click as the destination (1 -> 2)', () => {
+    expect(insertRouteWaypoint([a], b)).toEqual([a, b])
+  })
+
+  it('inserts a third click before the destination, which stays last (2 -> 3)', () => {
+    expect(insertRouteWaypoint([a, b], c)).toEqual([a, c, b])
+  })
+
+  it('inserts a fourth click before the destination too, after the first via-point (3 -> 4)', () => {
+    expect(insertRouteWaypoint([a, c, b], d)).toEqual([a, c, d, b])
   })
 })

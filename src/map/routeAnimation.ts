@@ -1,4 +1,3 @@
-import { totalLineLengthMeters } from './routeGeometry'
 import type { TimingTotals } from '../timeline/timing'
 import type { RouteObject } from '../state/types'
 
@@ -28,10 +27,10 @@ function appearTimeSec(appear: RouteObject['appear'], timing: TimingTotals): num
  * (fully drawn, no gating) — same convention as markerStateAt/areaStateAt.
  * Unlike those, the reveal itself is a modifier on the route, not fixed:
  * 'instant' shows the whole line the moment it appears; 'progressive' draws
- * it at a configurable simulated travel speed (km/h), so the actual draw
- * duration is derived from the route's length, not a fixed number of
- * seconds — a long route takes longer to draw than a short one at the same
- * speed.
+ * it linearly over a fixed drawDurationSec — a plain duration rather than a
+ * simulated travel speed, since the camera flight itself is usually only a
+ * few seconds long and a "realistic" speed would rarely finish drawing
+ * within it.
  */
 export function routeStateAt(route: RouteObject | null, timing: TimingTotals, sec: number | null): RouteFrame {
   if (!route || !route.visible || !route.geometry) return HIDDEN
@@ -43,10 +42,6 @@ export function routeStateAt(route: RouteObject | null, timing: TimingTotals, se
 
   if (route.reveal === 'instant') return { visible: true, fraction: 1 }
 
-  if (route.drawSpeedKmh <= 0) return { visible: true, fraction: 1 }
-
-  const totalKm = totalLineLengthMeters(route.geometry.coordinates) / 1000
-  const durationSec = (totalKm / route.drawSpeedKmh) * 3600
-  const fraction = durationSec > 0 ? Math.min(1, (sec - appearAt) / durationSec) : 1
+  const fraction = route.drawDurationSec > 0 ? Math.min(1, (sec - appearAt) / route.drawDurationSec) : 1
   return { visible: true, fraction }
 }

@@ -66,3 +66,15 @@ export function sliceLineByFraction(coordinates: GeoJSON.Position[], fraction: n
 export function waypointsToStraightLine(waypoints: RouteWaypoint[]): GeoJSON.LineString {
   return { type: 'LineString', coordinates: waypoints.map((w): GeoJSON.Position => [w.lng, w.lat]) }
 }
+
+/**
+ * Appends a right-clicked point to a route's waypoint list. Once a start and
+ * a destination both exist (length >= 2), the destination must stay the
+ * last element — a further click inserts a new via-point just before it,
+ * rather than becoming the new destination and demoting the previous one to
+ * a via-point.
+ */
+export function insertRouteWaypoint(waypoints: RouteWaypoint[], point: RouteWaypoint): RouteWaypoint[] {
+  if (waypoints.length < 2) return [...waypoints, point]
+  return [...waypoints.slice(0, -1), point, waypoints[waypoints.length - 1]]
+}
