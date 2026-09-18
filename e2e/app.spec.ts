@@ -37,6 +37,17 @@ async function isAreaVisible(page: import('@playwright/test').Page): Promise<boo
   })
 }
 
+/** True if the route line layer exists and is not hidden. */
+async function isRouteVisible(page: import('@playwright/test').Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const controller = window.__mapController
+    if (!controller) return false
+    const lineLayer = controller.map.getStyle().layers.find((l) => l.id === 'route-line-layer')
+    if (!lineLayer) return false
+    return controller.map.getLayoutProperty(lineLayer.id, 'visibility') !== 'none'
+  })
+}
+
 test('loads without console errors', async ({ page }) => {
   const errors: string[] = []
   page.on('console', (msg) => {
@@ -105,6 +116,52 @@ test('area pick hits the local database and never calls live Overpass', async ({
   await expect.poll(() => isAreaVisible(page)).toBe(true)
 
   expect(overpassRequests).toEqual([])
+})
+
+test('route: multiple right-clicks set waypoints, calculating via OSRM renders the line, and it survives a style change', async ({
+  page,
+}) => {
+  await gotoApp(page)
+
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 150, y: 120 } })
+  await canvas.click({ button: 'right', position: { x: 200, y: 160 } })
+  await canvas.click({ button: 'right', position: { x: 250, y: 130 } })
+
+  // The waypoint list renders each label as a <span> — scope to that tag,
+  // since "Start"/"Ziel" alone also match the camera panel's point labels.
+  await expect(page.locator('span', { hasText: 'Start' })).toBeVisible()
+  await expect(page.locator('span', { hasText: 'Zwischenstopp 1' })).toBeVisible()
+  await expect(page.locator('span', { hasText: 'Ziel' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Route berechnen' }).click()
+  await expect.poll(() => isRouteVisible(page)).toBe(true)
+
+  // setStyle(diff:false) tears the map's layers down and rebuilds them —
+  // the known pitfall this must survive, same as markers/areas.
+  await page.selectOption('#mapStyle', 'dark')
+  await page.waitForTimeout(300)
+  await expect.poll(() => isRouteVisible(page)).toBe(true)
+})
+
+test('route: straight-line mode renders without ever calling OSRM', async ({ page }) => {
+  const osrmRequests: string[] = []
+  page.on('request', (req) => {
+    if (req.url().includes('router.project-osrm.org')) osrmRequests.push(req.url())
+  })
+
+  await gotoApp(page)
+
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 150, y: 120 } })
+  await canvas.click({ button: 'right', position: { x: 250, y: 130 } })
+
+  await page.getByRole('radio', { name: 'Luftlinie' }).click()
+  await expect.poll(() => isRouteVisible(page)).toBe(true)
+
+  expect(osrmRequests).toEqual([])
 })
 
 test('preview runs and advances the time readout', async ({ page }) => {
