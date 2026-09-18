@@ -11,6 +11,7 @@ import {
   nextTickDelayMs,
   pickNextCountryToEnumerate,
   pickNextItem,
+  pickNextWork,
   recordTickResult,
 } from './queueLogic.ts'
 import type { EnumeratedAreaItem, EnumeratedCountry } from '../src/map/overpassEnumeration.ts'
@@ -135,5 +136,43 @@ describe('recordTickResult / nextTickDelayMs', () => {
     for (let i = 0; i < 10; i++) state = recordTickResult(state, false)
     state = recordTickResult(state, true)
     expect(nextTickDelayMs(state, 90_000)).toBe(90_000)
+  })
+})
+
+describe('pickNextWork', () => {
+  it('prefers enumerating the home country when it has no items yet', () => {
+    const state = applyBootstrap(createEmptyQueueState(), bootstrapCountries, EUROPE, 'DE')
+    expect(pickNextWork(state, 0)).toEqual({ type: 'enumerate', country: state.countries.DE })
+  })
+
+  // Regression test: once Germany is enumerated (potentially into many
+  // thousands of items — nature reserves alone can run into the low five
+  // figures), its own pending items must keep winning over enumerating the
+  // *next* country, otherwise the loop would burn through all ~200
+  // countries' enumeration queries before ever fetching a single area.
+  it('keeps working through the home country\'s items instead of enumerating the next country', () => {
+    let state = applyBootstrap(createEmptyQueueState(), bootstrapCountries, EUROPE, 'DE')
+    state = markCountryEnumerated(state, 'DE')
+    state = addItems(state, sampleItems.filter((i) => i.countryIso2 === 'DE'))
+
+    const work = pickNextWork(state, 0)
+    expect(work).toMatchObject({ type: 'fetch', item: { osmId: 1, countryIso2: 'DE' } })
+  })
+
+  it('falls back to enumeration once the enumerated country has no pending items left', () => {
+    let state = applyBootstrap(createEmptyQueueState(), bootstrapCountries, EUROPE, 'DE')
+    state = markCountryEnumerated(state, 'DE')
+    state = addItems(state, sampleItems.filter((i) => i.countryIso2 === 'DE'))
+    for (const i of sampleItems.filter((i) => i.countryIso2 === 'DE')) {
+      state = markItemDone(state, itemKey(i.osmType, i.osmId), '2026-01-01T00:00:00Z')
+    }
+
+    expect(pickNextWork(state, 0)).toEqual({ type: 'enumerate', country: state.countries.FR })
+  })
+
+  it('returns null once everything is enumerated and done', () => {
+    let state = applyBootstrap(createEmptyQueueState(), bootstrapCountries, EUROPE, 'DE')
+    for (const iso2 of ['DE', 'FR', 'US']) state = markCountryEnumerated(state, iso2)
+    expect(pickNextWork(state, 0)).toBeNull()
   })
 })

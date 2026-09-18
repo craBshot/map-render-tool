@@ -15,8 +15,7 @@ import {
   markCountryEnumerationFailed,
   markItemDone,
   markItemFailed,
-  pickNextCountryToEnumerate,
-  pickNextItem,
+  pickNextWork,
   recordTickResult,
   type QueueState,
 } from './queueLogic.ts'
@@ -70,8 +69,11 @@ export async function runTick(dataDir: string, state: WorkerState): Promise<Work
       return await persistAndReturn(dataDir, state, queue)
     }
 
-    const country = pickNextCountryToEnumerate(state.queue, Date.now())
-    if (country) {
+    const work = pickNextWork(state.queue, Date.now())
+    if (!work) return state // nothing eligible right now — fully caught up (or everything is backing off)
+
+    if (work.type === 'enumerate') {
+      const { country } = work
       try {
         const elements = await postOverpassQuery<OverpassRawTagElement>(
           buildCountryEnumerationQuery(country.iso2, country.tier),
@@ -80,6 +82,7 @@ export async function runTick(dataDir: string, state: WorkerState): Promise<Work
         const queue = recordTickResult(markCountryEnumerated(addItems(state.queue, items), country.iso2), true)
         return await persistAndReturn(dataDir, state, queue)
       } catch (err) {
+        console.error(`[area-db-worker] enumeration failed for ${country.iso2}:`, err)
         const queue = recordTickResult(
           markCountryEnumerationFailed(state.queue, country.iso2, String(err), nowIso),
           false,
@@ -88,9 +91,7 @@ export async function runTick(dataDir: string, state: WorkerState): Promise<Work
       }
     }
 
-    const item = pickNextItem(state.queue, Date.now())
-    if (!item) return state // nothing eligible right now — fully caught up (or everything is backing off)
-
+    const { item } = work
     const candidate: OverpassCandidate = {
       osmType: item.osmType,
       osmId: item.osmId,
@@ -127,6 +128,7 @@ export async function runTick(dataDir: string, state: WorkerState): Promise<Work
       await saveQueueState(progressPath(dataDir), queue)
       return { queue, areas, index: buildSpatialIndex(areas) }
     } catch (err) {
+      console.error(`[area-db-worker] fetch failed for ${item.osmType}/${item.osmId} (${item.name}):`, err)
       const queue = recordTickResult(
         markItemFailed(state.queue, itemKey(item.osmType, item.osmId), String(err), nowIso),
         false,

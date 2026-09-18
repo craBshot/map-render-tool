@@ -145,19 +145,42 @@ export function addItems(state: QueueState, items: EnumeratedAreaItem[]): QueueS
   return { ...state, items: nextItems }
 }
 
+function itemRank(state: QueueState, item: QueueItemState): (number | string)[] {
+  const country = state.countries[item.countryIso2]
+  const base: (number | string)[] = country ? countryRank(country) : [1, 1, item.countryIso2]
+  return [...base, kindRank(item.kind), item.osmId]
+}
+
 /** Next pending, backoff-eligible item to fetch geometry for. */
 export function pickNextItem(state: QueueState, nowMs: number): QueueItemState | null {
   const candidates = Object.values(state.items).filter(
     (item) => item.status === 'pending' && isRetryEligible(item.attempts, item.lastAttemptAt, nowMs),
   )
-  candidates.sort((a, b) => {
-    const countryA = state.countries[a.countryIso2]
-    const countryB = state.countries[b.countryIso2]
-    const rankA: (number | string)[] = countryA ? countryRank(countryA) : [1, 1, a.countryIso2]
-    const rankB: (number | string)[] = countryB ? countryRank(countryB) : [1, 1, b.countryIso2]
-    return compareTuples([...rankA, kindRank(a.kind), a.osmId], [...rankB, kindRank(b.kind), b.osmId])
-  })
+  candidates.sort((a, b) => compareTuples(itemRank(state, a), itemRank(state, b)))
   return candidates[0] ?? null
+}
+
+export type NextWork = { type: 'enumerate'; country: CountryState } | { type: 'fetch'; item: QueueItemState }
+
+/**
+ * Picks whichever unit of work is more urgent by the same priority ranking:
+ * a not-yet-enumerated country only wins over an already-enumerated
+ * country's own pending item if it ranks strictly ahead (home country, then
+ * deep tier, then iso2). This is what makes "Germany first" mean "finish
+ * fetching every one of Germany's items — admin/national_park first, then
+ * the much longer nature_reserve tail — before enumerating the next
+ * country," rather than "enumerate all 200+ countries before fetching
+ * anything," which is what calling the two pick functions independently
+ * (enumeration always preferred) would otherwise produce.
+ */
+export function pickNextWork(state: QueueState, nowMs: number): NextWork | null {
+  const country = pickNextCountryToEnumerate(state, nowMs)
+  const item = pickNextItem(state, nowMs)
+  if (!country) return item ? { type: 'fetch', item } : null
+  if (!item) return { type: 'enumerate', country }
+  return compareTuples(itemRank(state, item), countryRank(country)) <= 0
+    ? { type: 'fetch', item }
+    : { type: 'enumerate', country }
 }
 
 export function markItemDone(state: QueueState, key: string, nowIso: string): QueueState {
