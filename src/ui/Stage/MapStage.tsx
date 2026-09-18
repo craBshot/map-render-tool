@@ -5,7 +5,7 @@ import { areaStateAt } from '../../map/areaAnimation'
 import { camAt } from '../../map/camera'
 import { MapController } from '../../map/MapController'
 import { markerStateAt } from '../../map/markerAnimation'
-import { waypointsToStraightLine } from '../../map/routeGeometry'
+import { insertRouteWaypoint, waypointsToStraightLine } from '../../map/routeGeometry'
 import { routeStateAt } from '../../map/routeAnimation'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
@@ -101,7 +101,7 @@ export function MapStage() {
 
       if (useEditorStore.getState().pointInteractionMode === 'route') {
         useProjectStore.getState().setProject((p) => {
-          const waypoints = [...(p.route?.waypoints ?? []), { lng, lat }]
+          const waypoints = insertRouteWaypoint(p.route?.waypoints ?? [], { lng, lat })
           const route = p.route ? { ...p.route, waypoints } : createDefaultRoute(waypoints)
           return {
             ...p,
