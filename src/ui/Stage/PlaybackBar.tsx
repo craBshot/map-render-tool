@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { areaStateAt } from '../../map/areaAnimation'
 import { camAt } from '../../map/camera'
 import { markerStateAt } from '../../map/markerAnimation'
+import { routeStateAt } from '../../map/routeAnimation'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
 import { resolveAreaStyle } from '../../state/types'
@@ -33,6 +34,7 @@ export function PlaybackBar() {
         const style = resolveAreaStyle(area.styleId, project.areaStyles)
         return { area, style, frame: areaStateAt(style, projectTotals, sec) }
       }),
+      project.route ? { route: project.route, frame: routeStateAt(project.route, projectTotals, sec) } : null,
     )
   }
 
@@ -52,6 +54,9 @@ export function PlaybackBar() {
         const style = resolveAreaStyle(area.styleId, project.areaStyles)
         return { area, style, frame: areaStateAt(style, projectTotals, null) }
       }),
+    )
+    controller.renderRoute(
+      project.route ? { route: project.route, frame: routeStateAt(project.route, projectTotals, null) } : null,
     )
   }
 
