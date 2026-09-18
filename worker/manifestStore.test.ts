@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeBbox, rawFileName } from './manifestStore'
+import { computeBbox, rawFileName } from './manifestStore.ts'
 
 describe('computeBbox', () => {
   it('computes the bounding box of a simple Polygon', () => {

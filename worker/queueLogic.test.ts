@@ -12,8 +12,8 @@ import {
   pickNextCountryToEnumerate,
   pickNextItem,
   recordTickResult,
-} from './queueLogic'
-import type { EnumeratedAreaItem, EnumeratedCountry } from '../src/map/overpassEnumeration'
+} from './queueLogic.ts'
+import type { EnumeratedAreaItem, EnumeratedCountry } from '../src/map/overpassEnumeration.ts'
 
 const EUROPE: ReadonlySet<string> = new Set(['DE', 'FR', 'AT'])
 

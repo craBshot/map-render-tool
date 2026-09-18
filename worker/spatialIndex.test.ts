@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildSpatialIndex, queryPoint, type IndexedArea } from './spatialIndex'
+import { buildSpatialIndex, queryPoint, type IndexedArea } from './spatialIndex.ts'
 
 function square(
   osmId: number,
@@ -48,13 +48,6 @@ describe('buildSpatialIndex / queryPoint', () => {
   })
 
   it('excludes bbox-overlapping but not-actually-containing areas (bbox is a coarse pre-filter, not the final answer)', () => {
-    // An L-shaped-bbox situation approximated by a small square whose bbox
-    // includes the query point but whose polygon does not.
-    const near = square(1, 'Near square', 'protected_area', [0, 0, 2, 2])
-    const index = buildSpatialIndex([near])
-    // (1.9, 1.9) is inside the bbox AND the polygon (it's a real square) — pick
-    // a point inside the bbox cell grid but outside the polygon by using a
-    // non-square geometry instead.
     const triangle: IndexedArea = {
       osmType: 'way',
       osmId: 2,
