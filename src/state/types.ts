@@ -1,4 +1,4 @@
-export const PROJECT_VERSION = 2
+export const PROJECT_VERSION = 3
 
 /**
  * crypto.randomUUID() requires a secure context, but this app must also
@@ -98,6 +98,39 @@ export function resolveAreaStyle(styleId: string | null, styles: AreaStyle[]): A
   return styles.find((s) => s.id === styleId) ?? null
 }
 
+export type RouteProfile = 'driving' | 'walking' | 'cycling'
+export type RoutingMode = 'osrm' | 'straight'
+export type RouteReveal = 'instant' | 'progressive'
+
+export interface RouteWaypoint {
+  lng: number
+  lat: number
+}
+
+export interface RouteObject {
+  id: string
+  /** Order: [start, ...via-points, destination]. */
+  waypoints: RouteWaypoint[]
+  routingMode: RoutingMode
+  /** Only relevant when routingMode === 'osrm'. */
+  profile: RouteProfile
+  /** osrm: null until "Route berechnen" succeeds. straight: always kept in sync with waypoints. */
+  geometry: GeoJSON.LineString | null
+  /** OSRM's own travel-time estimate — informational only, always null for routingMode === 'straight'. */
+  osrmDurationSec: number | null
+  color: string
+  widthPx: number
+  visible: boolean
+  appear: {
+    mode: 'start' | 'zoomStart' | 'zoomEnd' | 'custom'
+    atSec?: number
+  }
+  /** 'instant' = shows fully at appear time. 'progressive' = draws in at drawSpeedKmh. */
+  reveal: RouteReveal
+  /** Only relevant when reveal === 'progressive'. Simulated travel speed — the actual draw duration is derived from route length / speed, not a fixed number of seconds. */
+  drawSpeedKmh: number
+}
+
 export interface ExportSettings {
   resolution: { preset: ResolutionPreset; width: number; height: number }
   fps: 24 | 25 | 30 | 50 | 60
@@ -121,6 +154,8 @@ export interface ProjectFile {
   // Order is stacking order: earlier entries render on top.
   areas: AreaObject[]
   areaStyles: AreaStyle[]
+  // Single route for v1 — additive to widen into a list later, same as markers.
+  route: RouteObject | null
   export: ExportSettings
 }
 
@@ -175,6 +210,23 @@ export function createDefaultArea(
   }
 }
 
+export function createDefaultRoute(waypoints: RouteWaypoint[]): RouteObject {
+  return {
+    id: generateId(),
+    waypoints,
+    routingMode: 'osrm',
+    profile: 'driving',
+    geometry: null,
+    osrmDurationSec: null,
+    color: '#e6572f',
+    widthPx: 4,
+    visible: true,
+    appear: { mode: 'zoomStart' },
+    reveal: 'progressive',
+    drawSpeedKmh: 80,
+  }
+}
+
 export function createDefaultProject(): ProjectFile {
   return {
     version: PROJECT_VERSION,
@@ -192,6 +244,7 @@ export function createDefaultProject(): ProjectFile {
     markers: [],
     areas: [],
     areaStyles: createDefaultAreaStyles(),
+    route: null,
     export: {
       resolution: { preset: '1920x1080', width: 1920, height: 1080 },
       fps: 30,

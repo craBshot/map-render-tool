@@ -18,16 +18,29 @@ describe('migrate', () => {
     expect(() => migrate(project)).toThrow(UnsupportedProjectVersionError)
   })
 
-  it('migrates a v1 project (no areas/areaStyles) to v2', () => {
+  it('migrates a v1 project (no areas/areaStyles/route) all the way to the current version', () => {
     const current = createDefaultProject()
     const v1 = { ...current, version: 1 } as Record<string, unknown>
     delete v1.areas
     delete v1.areaStyles
+    delete v1.route
 
     const migrated = migrate(v1)
 
-    expect(migrated.version).toBe(2)
+    expect(migrated.version).toBe(3)
     expect(migrated.areas).toEqual([])
     expect(migrated.areaStyles).toHaveLength(2)
+    expect(migrated.route).toBeNull()
+  })
+
+  it('migrates a v2 project (no route) to v3', () => {
+    const current = createDefaultProject()
+    const v2 = { ...current, version: 2 } as Record<string, unknown>
+    delete v2.route
+
+    const migrated = migrate(v2)
+
+    expect(migrated.version).toBe(3)
+    expect(migrated.route).toBeNull()
   })
 })
