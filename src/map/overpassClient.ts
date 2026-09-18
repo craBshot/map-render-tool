@@ -1,5 +1,5 @@
-import type { AreaCandidateTypeSettings } from '../state/areaCandidateTypeSettings'
-import { overpassElementToPolygon, type OverpassElement } from './overpassGeometry'
+import type { AreaCandidateTypeSettings } from '../state/areaCandidateTypeSettings.ts'
+import { overpassElementToPolygon, type OverpassElement } from './overpassGeometry.ts'
 
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter'
 
