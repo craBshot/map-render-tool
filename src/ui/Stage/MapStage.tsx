@@ -5,9 +5,11 @@ import { areaStateAt } from '../../map/areaAnimation'
 import { camAt } from '../../map/camera'
 import { MapController } from '../../map/MapController'
 import { markerStateAt } from '../../map/markerAnimation'
+import { waypointsToStraightLine } from '../../map/routeGeometry'
+import { routeStateAt } from '../../map/routeAnimation'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
-import { createDefaultMarker, resolveAreaStyle } from '../../state/types'
+import { createDefaultMarker, createDefaultRoute, resolveAreaStyle } from '../../state/types'
 import { timingTotals } from '../../timeline/timing'
 import { Crosshair } from './Crosshair'
 import { Readout } from './Readout'
@@ -65,6 +67,9 @@ export function MapStage() {
             frame: areaStateAt(resolveAreaStyle(area.styleId, current.areaStyles), totals, null),
           })),
         )
+        controller.renderRoute(
+          current.route ? { route: current.route, frame: routeStateAt(current.route, totals, null) } : null,
+        )
         controller.renderMarkers(
           current.markers.map((marker) => ({ marker, frame: markerStateAt(marker, totals, null) })),
         )
@@ -91,6 +96,18 @@ export function MapStage() {
 
       if (useEditorStore.getState().pointInteractionMode === 'area') {
         useEditorStore.getState().setPendingAreaPick({ lng, lat })
+        return
+      }
+
+      if (useEditorStore.getState().pointInteractionMode === 'route') {
+        useProjectStore.getState().setProject((p) => {
+          const waypoints = [...(p.route?.waypoints ?? []), { lng, lat }]
+          const route = p.route ? { ...p.route, waypoints } : createDefaultRoute(waypoints)
+          return {
+            ...p,
+            route: route.routingMode === 'straight' ? { ...route, geometry: waypointsToStraightLine(waypoints) } : route,
+          }
+        })
         return
       }
 
@@ -166,6 +183,16 @@ export function MapStage() {
     )
     controller.reorderAreaLayers(project.areas.map((a) => a.id))
   }, [project.areas, project.areaStyles, project.camera.timing])
+
+  // Route content/appearance — same static (sec=null) editor treatment as markers/areas.
+  useEffect(() => {
+    const controller = controllerRef.current
+    if (!controller) return
+    const totals = timingTotals(project.camera.timing)
+    controller.renderRoute(
+      project.route ? { route: project.route, frame: routeStateAt(project.route, totals, null) } : null,
+    )
+  }, [project.route, project.camera.timing])
 
   return (
     <div ref={stageRef} className={styles.stage}>
