@@ -1,6 +1,8 @@
 services:
   map-render-tool:
-    build: .
+    build:
+      context: .
+      target: final
     container_name: map-render-tool
     restart: unless-stopped
     # Bound to localhost by default — point your existing Caddy instance at
@@ -8,3 +10,22 @@ services:
     # entirely) if Caddy runs in another container on a shared network instead.
     ports:
       - "127.0.0.1:8080:80"
+    depends_on:
+      - area-db-worker
+
+  # Slowly, continuously builds a local database of administrative
+  # boundaries and protected areas in the background (see CLAUDE.md), so
+  # right-click area lookups don't depend on the shared public Overpass
+  # instance being reachable. No externally published port — nginx reaches
+  # it internally by service name (see nginx.conf's /area-db/ proxy).
+  area-db-worker:
+    build:
+      context: .
+      target: worker
+    container_name: area-db-worker
+    restart: unless-stopped
+    volumes:
+      - area-db-data:/data/area-db
+
+volumes:
+  area-db-data:
