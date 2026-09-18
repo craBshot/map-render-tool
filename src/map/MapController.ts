@@ -3,7 +3,9 @@ import type { AreaFrame } from './areaAnimation'
 import type { CameraFrame } from './camera'
 import { applyLabelSettings, captureOriginalLayers, type OriginalLayerInfo } from './labels'
 import type { MarkerFrame } from './markerAnimation'
-import type { AreaObject, AreaStyle, MarkerObject, StyleId, StyleState } from '../state/types'
+import { sliceLineByFraction } from './routeGeometry'
+import type { RouteFrame } from './routeAnimation'
+import type { AreaObject, AreaStyle, MarkerObject, RouteObject, StyleId, StyleState } from '../state/types'
 
 export const STYLE_URLS: Record<StyleId, string> = {
   positron: 'https://tiles.openfreemap.org/styles/positron',
@@ -33,6 +35,11 @@ export interface RenderedArea {
   area: AreaObject
   style: AreaStyle | null
   frame: AreaFrame
+}
+
+export interface RenderedRoute {
+  route: RouteObject
+  frame: RouteFrame
 }
 
 export interface MapControllerOptions {
@@ -144,16 +151,23 @@ export class MapController {
   }
 
   /**
-   * Applies a precomputed camera + marker + area frame together — the one
-   * path playback and export both go through. Free editing (camera driven
-   * by the user's own pan/zoom) calls applyCameraFrame()/renderMarkers()/
-   * renderAreas() separately instead, so editing an object doesn't snap the
-   * camera back. Areas render before markers so a filled area can never
-   * obscure the target marker.
+   * Applies a precomputed camera + marker + area + route frame together —
+   * the one path playback and export both go through. Free editing (camera
+   * driven by the user's own pan/zoom) calls applyCameraFrame()/
+   * renderMarkers()/renderAreas()/renderRoute() separately instead, so
+   * editing an object doesn't snap the camera back. Areas render before the
+   * route, which renders before markers, so the target marker is never
+   * obscured.
    */
-  applyFrame(cameraFrame: CameraFrame, markers: RenderedMarker[], areas: RenderedArea[] = []): void {
+  applyFrame(
+    cameraFrame: CameraFrame,
+    markers: RenderedMarker[],
+    areas: RenderedArea[] = [],
+    route: RenderedRoute | null = null,
+  ): void {
     this.applyCameraFrame(cameraFrame)
     this.renderAreas(areas)
+    this.renderRoute(route)
     this.renderMarkers(markers)
   }
 
@@ -231,6 +245,46 @@ export class MapController {
     this.map.setPaintProperty(lineLayerId, 'line-width', style.outline.enabled ? style.outline.widthPx : 0)
     this.map.setPaintProperty(lineLayerId, 'line-opacity', style.outline.enabled ? frame.opacity : 0)
     this.map.setPaintProperty(lineLayerId, 'line-dasharray', style.outline.dashed ? [2, 2] : undefined)
+  }
+
+  /** Route line — one per project (v1). Inserted below markers, above areas (renderAreas/renderRoute/renderMarkers order). */
+  renderRoute(rendered: RenderedRoute | null): void {
+    if (!this.styleReady) return
+    const sourceId = 'route-line'
+    const lineLayerId = `${sourceId}-layer`
+
+    const visible = !!rendered && rendered.frame.visible && rendered.route.geometry !== null
+    const source = this.map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined
+
+    if (!visible) {
+      if (source) this.map.setLayoutProperty(lineLayerId, 'visibility', 'none')
+      return
+    }
+
+    const route = rendered.route
+    const coordinates = sliceLineByFraction(route.geometry!.coordinates, rendered.frame.fraction)
+    const data = { type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates } }
+
+    if (!source) {
+      const beforeId = this.firstMarkerLayerId()
+      this.map.addSource(sourceId, { type: 'geojson', data })
+      this.map.addLayer(
+        {
+          id: lineLayerId,
+          type: 'line',
+          source: sourceId,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {},
+        },
+        beforeId,
+      )
+    } else {
+      source.setData(data)
+    }
+
+    this.map.setLayoutProperty(lineLayerId, 'visibility', 'visible')
+    this.map.setPaintProperty(lineLayerId, 'line-color', route.color)
+    this.map.setPaintProperty(lineLayerId, 'line-width', route.widthPx)
   }
 
   /** Set export resolution via pixel ratio, not container size, so framing matches the preview. */
