@@ -16,6 +16,12 @@ const migrations: Record<number, Migration> = {
     areas: [],
     areaStyles: createDefaultAreaStyles(),
   }),
+  // v2 -> v3: added route (single route, drawn progressively).
+  2: (data) => ({
+    ...(data as object),
+    version: 3,
+    route: null,
+  }),
 }
 
 export class UnsupportedProjectVersionError extends Error {

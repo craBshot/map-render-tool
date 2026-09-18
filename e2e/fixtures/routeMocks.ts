@@ -70,6 +70,26 @@ const MOCK_LOCAL_AREA_HIT = {
   ],
 }
 
+// A small OSRM /route/v1/ response shape — one combined LineString, matching
+// what geometries=geojson&overview=full actually returns (verified live
+// against router.project-osrm.org during planning).
+const MOCK_OSRM_RESPONSE = {
+  code: 'Ok',
+  routes: [
+    {
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [9, 50],
+          [9.2, 50.1],
+          [9.4, 50.3],
+        ],
+      },
+      duration: 1234.5,
+    },
+  ],
+}
+
 export interface MockExternalServicesOptions {
   /** true = /area-db/candidates returns a hit; false (default) = empty, so the live Overpass path is exercised. */
   localAreaHit?: boolean
@@ -93,4 +113,7 @@ export async function mockExternalServices(page: Page, options: MockExternalServ
     const body = options.localAreaHit ? MOCK_LOCAL_AREA_HIT : { areas: [] }
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) })
   })
+  await page.route('**/router.project-osrm.org/**', (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify(MOCK_OSRM_RESPONSE) }),
+  )
 }

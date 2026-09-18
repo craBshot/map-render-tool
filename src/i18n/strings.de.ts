@@ -66,6 +66,7 @@ export const de = {
   interactionMode: {
     marker: 'Marker setzen',
     area: 'Gebiet abfragen',
+    route: 'Route planen',
   },
   area: {
     heading: 'Gebiete',
@@ -112,6 +113,43 @@ export const de = {
   areaTypeSettings: {
     heading: 'Gebietstypen',
     hint: 'Welche Gebietstypen bei einer Abfrage überhaupt als Auswahl auftauchen.',
+  },
+  route: {
+    heading: 'Route',
+    pickHint: 'Rechtsklick im Routen-Modus fügt Wegpunkte an — erster Klick ist der Start, jeder weitere Klick verlängert die Route und wird der neue Zielpunkt.',
+    waypointStart: 'Start',
+    waypointDestination: 'Ziel',
+    waypointVia: (n: number) => `Zwischenstopp ${n}`,
+    moveUp: 'Nach oben',
+    moveDown: 'Nach unten',
+    deleteWaypoint: 'Wegpunkt löschen',
+    routingMode: 'Routing',
+    routingModes: {
+      osrm: 'Straßenroute (OSRM)',
+      straight: 'Luftlinie',
+    },
+    profile: 'Profil',
+    profiles: {
+      driving: 'Auto',
+      walking: 'Fuß',
+      cycling: 'Fahrrad',
+    },
+    calculate: 'Route berechnen',
+    calculating: 'Route wird berechnet …',
+    distance: (km: string) => `${km} km`,
+    distanceWithDuration: (km: string, duration: string) => `${km} km, ca. ${duration}`,
+    visible: 'Sichtbar',
+    color: 'Farbe',
+    width: 'Linienbreite (px)',
+    reveal: 'Zeichnen',
+    revealModes: {
+      instant: 'Komplett einblenden',
+      progressive: 'Zeichnen',
+    },
+    speed: 'Tempo (km/h)',
+    appear: 'Erscheint',
+    appearAt: 'Zeitpunkt (s)',
+    deleteRoute: 'Route löschen',
   },
   export: {
     heading: 'Export',
