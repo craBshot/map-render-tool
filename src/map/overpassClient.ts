@@ -17,7 +17,7 @@ export interface OverpassCandidate {
   adminLevel?: number
 }
 
-function classify(tags: Record<string, string>): keyof AreaCandidateTypeSettings {
+export function classifyAreaKind(tags: Record<string, string>): keyof AreaCandidateTypeSettings {
   if (tags.boundary === 'administrative' && tags.admin_level) return 'administrative'
   if (tags.boundary === 'protected_area') return 'protected_area'
   if (tags.boundary === 'national_park') return 'national_park'
@@ -46,7 +46,7 @@ export function filterOverpassCandidates(
     const name = element.tags?.name
     if (!name) continue
 
-    const kind = classify(element.tags!)
+    const kind = classifyAreaKind(element.tags!)
     if (!enabled[kind]) continue
 
     candidates.push({
