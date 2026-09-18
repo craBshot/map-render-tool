@@ -1,8 +1,9 @@
 import { areaStateAt } from '../map/areaAnimation'
 import { camAt } from '../map/camera'
 import { drawAttribution } from '../map/attribution'
-import type { MapController, RenderedArea, RenderedMarker } from '../map/MapController'
+import type { MapController, RenderedArea, RenderedMarker, RenderedRoute } from '../map/MapController'
 import { markerStateAt } from '../map/markerAnimation'
+import { routeStateAt } from '../map/routeAnimation'
 import { resolveAreaStyle, type ProjectFile } from '../state/types'
 import { timingTotals } from '../timeline/timing'
 import { createImageSequenceSink } from './imageSequenceSink'
@@ -30,10 +31,11 @@ export interface RunExportOptions {
 
 /**
  * Renders the project deterministically, frame by frame: jumpTo the exact
- * camera/marker/area state for that frame, wait for idle, then read the
- * canvas. Never records a real-time animation. Preview and export share the
- * same camAt()/markerStateAt()/areaStateAt() + MapController rendering as
- * the editor's static view — only the driving time source differs.
+ * camera/marker/area/route state for that frame, wait for idle, then read
+ * the canvas. Never records a real-time animation. Preview and export share
+ * the same camAt()/markerStateAt()/areaStateAt()/routeStateAt() +
+ * MapController rendering as the editor's static view — only the driving
+ * time source differs.
  */
 export async function runExport({ controller, project, onProgress, isCancelled }: RunExportOptions): Promise<ExportResult> {
   const { width, height } = project.export.resolution
@@ -76,12 +78,16 @@ export async function runExport({ controller, project, onProgress, isCancelled }
         const style = resolveAreaStyle(area.styleId, project.areaStyles)
         return { area, style, frame: areaStateAt(style, totals, sec) }
       })
-      const key = `${t}|${JSON.stringify(markers.map((m) => m.frame))}|${JSON.stringify(areas.map((a) => a.frame))}`
+      const route: RenderedRoute | null = project.route
+        ? { route: project.route, frame: routeStateAt(project.route, totals, sec) }
+        : null
+      const key = `${t}|${JSON.stringify(markers.map((m) => m.frame))}|${JSON.stringify(areas.map((a) => a.frame))}|${JSON.stringify(route?.frame)}`
       const changed = key !== lastKey
 
       if (changed) {
         controller.applyCameraFrame(camAt(project.camera, t))
         controller.renderAreas(areas)
+        controller.renderRoute(route)
         controller.renderMarkers(markers)
         if (!areasOrdered) {
           controller.reorderAreaLayers(project.areas.map((a) => a.id))
