@@ -71,6 +71,7 @@ export const en: typeof de = {
   interactionMode: {
     marker: 'Set marker',
     area: 'Query area',
+    route: 'Plan route',
   },
   area: {
     heading: 'Areas',
@@ -117,6 +118,43 @@ export const en: typeof de = {
   areaTypeSettings: {
     heading: 'Area types',
     hint: 'Which area types even show up as options when querying a point.',
+  },
+  route: {
+    heading: 'Route',
+    pickHint: 'Right-click in route mode appends a waypoint — the first click is the start, every further click extends the route and becomes the new destination.',
+    waypointStart: 'Start',
+    waypointDestination: 'Destination',
+    waypointVia: (n: number) => `Via ${n}`,
+    moveUp: 'Move up',
+    moveDown: 'Move down',
+    deleteWaypoint: 'Delete waypoint',
+    routingMode: 'Routing',
+    routingModes: {
+      osrm: 'Street route (OSRM)',
+      straight: 'Straight line',
+    },
+    profile: 'Profile',
+    profiles: {
+      driving: 'Driving',
+      walking: 'Walking',
+      cycling: 'Cycling',
+    },
+    calculate: 'Calculate route',
+    calculating: 'Calculating route …',
+    distance: (km: string) => `${km} km`,
+    distanceWithDuration: (km: string, duration: string) => `${km} km, approx. ${duration}`,
+    visible: 'Visible',
+    color: 'Color',
+    width: 'Line width (px)',
+    reveal: 'Drawing',
+    revealModes: {
+      instant: 'Show fully',
+      progressive: 'Draw progressively',
+    },
+    speed: 'Speed (km/h)',
+    appear: 'Appears',
+    appearAt: 'Time (s)',
+    deleteRoute: 'Delete route',
   },
   export: {
     heading: 'Export',

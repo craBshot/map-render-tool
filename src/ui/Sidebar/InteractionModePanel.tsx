@@ -2,7 +2,7 @@ import { useEditorStore } from '../../state/editorStore'
 import { strings } from '../../i18n'
 import styles from './InteractionModePanel.module.css'
 
-/** Switches what a right-click on the map does — set the marker, or query an area. */
+/** Switches what a right-click on the map does — set the marker, query an area, or extend the route. */
 export function InteractionModePanel() {
   const mode = useEditorStore((s) => s.pointInteractionMode)
   const locked = useEditorStore((s) => s.locked)
@@ -10,7 +10,7 @@ export function InteractionModePanel() {
 
   return (
     <div className={styles.switch} role="radiogroup">
-      {(['marker', 'area'] as const).map((value) => (
+      {(['marker', 'area', 'route'] as const).map((value) => (
         <button
           key={value}
           type="button"
