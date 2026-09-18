@@ -1,7 +1,15 @@
 import type { AreaCandidateTypeSettings } from '../state/areaCandidateTypeSettings.ts'
 import { overpassElementToPolygon, type OverpassElement } from './overpassGeometry.ts'
 
-const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter'
+export const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter'
+
+/** POSTs an Overpass QL query and returns its `elements`. Shared by the on-demand pick flow and the worker's enumeration step. */
+export async function postOverpassQuery<T>(query: string): Promise<T[]> {
+  const res = await fetch(OVERPASS_ENDPOINT, { method: 'POST', body: `data=${encodeURIComponent(query)}` })
+  if (!res.ok) throw new Error(`Overpass antwortet nicht (${res.status})`)
+  const data: { elements: T[] } = await res.json()
+  return data.elements
+}
 
 export interface OverpassRawTagElement {
   type: 'way' | 'relation' | 'node'
@@ -67,19 +75,14 @@ export async function findAreaCandidates(
   enabled: AreaCandidateTypeSettings,
 ): Promise<OverpassCandidate[]> {
   const query = `[out:json][timeout:25];is_in(${lat},${lng})->.a;(way(pivot.a);relation(pivot.a);)->.b;.b out tags;`
-  const res = await fetch(OVERPASS_ENDPOINT, { method: 'POST', body: `data=${encodeURIComponent(query)}` })
-  if (!res.ok) throw new Error(`Overpass antwortet nicht (${res.status})`)
-  const data: { elements: OverpassRawTagElement[] } = await res.json()
-  return filterOverpassCandidates(data.elements, enabled)
+  const elements = await postOverpassQuery<OverpassRawTagElement>(query)
+  return filterOverpassCandidates(elements, enabled)
 }
 
 /** Full geometry for exactly one picked candidate — never fetched for unpicked ones. */
 export async function fetchAreaGeometry(candidate: OverpassCandidate): Promise<GeoJSON.Polygon | GeoJSON.MultiPolygon> {
   const query = `[out:json][timeout:25];${candidate.osmType}(${candidate.osmId});out geom;`
-  const res = await fetch(OVERPASS_ENDPOINT, { method: 'POST', body: `data=${encodeURIComponent(query)}` })
-  if (!res.ok) throw new Error(`Overpass antwortet nicht (${res.status})`)
-  const data: { elements: OverpassElement[] } = await res.json()
-  const [element] = data.elements
+  const [element] = await postOverpassQuery<OverpassElement>(query)
   if (!element) throw new Error('Overpass hat keine Geometrie für dieses Gebiet geliefert.')
   return overpassElementToPolygon(element)
 }
