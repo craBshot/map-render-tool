@@ -7,7 +7,7 @@ export const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter'
 export async function postOverpassQuery<T>(query: string): Promise<T[]> {
   const res = await fetch(OVERPASS_ENDPOINT, { method: 'POST', body: `data=${encodeURIComponent(query)}` })
   if (!res.ok) throw new Error(`Overpass antwortet nicht (${res.status})`)
-  const data: { elements: T[] } = await res.json()
+  const data = (await res.json()) as { elements: T[] }
   return data.elements
 }
 
