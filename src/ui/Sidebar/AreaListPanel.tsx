@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { findAreaCandidatesWithFallback, resolveAreaGeometry, type AreaLookupCandidate } from '../../map/areaLookup'
 import { useEditorStore } from '../../state/editorStore'
 import { useSettingsStore } from '../../state/settingsStore'
@@ -17,12 +17,19 @@ export function AreaListPanel() {
   const setProject = useProjectStore((s) => s.setProject)
   const locked = useEditorStore((s) => s.locked)
   const pendingAreaPick = useEditorStore((s) => s.pendingAreaPick)
+  const selectedObjectId = useEditorStore((s) => s.selectedObjectId)
   const enabledTypes = useSettingsStore((s) => s.areaCandidateTypes)
   const t = strings.area
 
   const [candidates, setCandidates] = useState<AreaLookupCandidate[] | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
+
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  useEffect(() => {
+    if (!selectedObjectId) return
+    cardRefs.current.get(selectedObjectId)?.scrollIntoView({ block: 'nearest' })
+  }, [selectedObjectId])
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -136,7 +143,14 @@ export function AreaListPanel() {
         )}
 
         {areas.map((area, index) => (
-          <div key={area.id} className={styles.card}>
+          <div
+            key={area.id}
+            ref={(el) => {
+              if (el) cardRefs.current.set(area.id, el)
+              else cardRefs.current.delete(area.id)
+            }}
+            className={`${styles.card} ${selectedObjectId === area.id ? styles.cardSelected : ''}`}
+          >
             <div className={styles.cardHeader}>
               <input
                 type="text"

@@ -81,6 +81,10 @@
   align-items: center;
   gap: 8px;
   padding: 3px 20px;
+  border-radius: 4px;
+}
+.rowSelected {
+  background: rgba(47, 107, 255, 0.1);
 }
 
 .rowLabel {
@@ -111,6 +115,13 @@
   height: 16px;
   background: rgba(0, 0, 0, 0.04);
   border-radius: 3px;
+}
+.rowTrackDraggable {
+  cursor: grab;
+  touch-action: none;
+}
+.rowTrackDraggable:active {
+  cursor: grabbing;
 }
 
 .bar {

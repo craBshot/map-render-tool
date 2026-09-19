@@ -27,9 +27,29 @@ export function Timeline() {
   const playing = useEditorStore((s) => s.playing)
   const locked = useEditorStore((s) => s.locked)
   const playbackTimeSec = useEditorStore((s) => s.playbackTimeSec)
+  const selectedObjectId = useEditorStore((s) => s.selectedObjectId)
+  const setProject = useProjectStore((s) => s.setProject)
   const project = useProjectStore((s) => s.project)
   const totalSec = cameraTotalSec(project.camera.waypoints)
   const ctx: TimingContext = { totalSec }
+
+  function selectObject(id: string) {
+    useEditorStore.getState().setSelectedObjectId(id)
+  }
+
+  function repositionMarker(id: string, startSec: number) {
+    setProject((p) => ({
+      ...p,
+      markers: p.markers.map((m) => (m.id === id ? { ...m, appear: { ...m.appear, startSec } } : m)),
+    }))
+  }
+
+  function repositionArea(id: string, startSec: number) {
+    setProject((p) => ({
+      ...p,
+      areas: p.areas.map((a) => (a.id === id ? { ...a, appear: { ...a.appear, startSec } } : a)),
+    }))
+  }
 
   useEffect(() => () => stop(), [])
 
@@ -131,6 +151,9 @@ export function Timeline() {
             color={marker.color}
             appear={marker.appear}
             ctx={ctx}
+            selected={selectedObjectId === marker.id}
+            onSelect={selectObject}
+            onReposition={repositionMarker}
           />
         ))}
         {project.areas.map((area) => (
@@ -141,6 +164,9 @@ export function Timeline() {
             color={areaBarColor(resolveAreaStyle(area.styleId, project.areaStyles))}
             appear={area.appear}
             ctx={ctx}
+            selected={selectedObjectId === area.id}
+            onSelect={selectObject}
+            onReposition={repositionArea}
           />
         ))}
         {project.route && <TimelineRouteRow route={project.route} ctx={ctx} />}

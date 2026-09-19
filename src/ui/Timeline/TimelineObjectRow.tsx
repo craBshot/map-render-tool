@@ -1,7 +1,12 @@
+import { useCallback, useRef } from 'react'
 import type { AppearTiming } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
 import { appearBarLayout } from './timelineLayout'
+import { useHorizontalDrag } from './useHorizontalDrag'
 import styles from './Timeline.module.css'
+
+/** Below this fracX delta (as a fraction of track width), a drag gesture is treated as a click, not a move. */
+const CLICK_THRESHOLD_FRAC = 0.003
 
 export interface TimelineObjectRowProps {
   id: string
@@ -9,19 +14,51 @@ export interface TimelineObjectRowProps {
   color: string
   appear: AppearTiming
   ctx: TimingContext
+  selected: boolean
+  onSelect: (id: string) => void
+  onReposition: (id: string, startSec: number) => void
 }
 
-/** One row for a marker or an area: label, color swatch, 3-part fadeIn/hold/fadeOut bar. */
-export function TimelineObjectRow({ id, label, color, appear, ctx }: TimelineObjectRowProps) {
+/** One row for a marker or an area: label, color swatch, 3-part fadeIn/hold/fadeOut bar — draggable as a whole, clickable to select. */
+export function TimelineObjectRow({ id, label, color, appear, ctx, selected, onSelect, onReposition }: TimelineObjectRowProps) {
   const layout = appearBarLayout(appear, ctx)
+  const trackRef = useRef<HTMLDivElement>(null)
+  // Lazily initialized on the first onDrag call of each gesture (see handleDrag) — null between gestures.
+  const gestureRef = useRef<{ fracX0: number; startSec0: number; moved: boolean } | null>(null)
+
+  const handleDrag = useCallback(
+    (fracX: number) => {
+      if (!gestureRef.current) {
+        gestureRef.current = { fracX0: fracX, startSec0: appear.startSec, moved: false }
+      }
+      const gesture = gestureRef.current
+      if (!gesture.moved && Math.abs(fracX - gesture.fracX0) > CLICK_THRESHOLD_FRAC) gesture.moved = true
+      const deltaSec = (fracX - gesture.fracX0) * ctx.totalSec
+      onReposition(id, Math.max(0, gesture.startSec0 + deltaSec))
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- appear.startSec is read once, on gesture start; not a live dependency
+    [ctx.totalSec, id, onReposition],
+  )
+
+  const handleDragEnd = useCallback(() => {
+    if (gestureRef.current && !gestureRef.current.moved) onSelect(id)
+    gestureRef.current = null
+  }, [id, onSelect])
+
+  const { startDrag } = useHorizontalDrag(trackRef, handleDrag, handleDragEnd)
 
   return (
-    <div className={styles.row} data-testid={`timeline-object-${id}`}>
+    <div className={`${styles.row} ${selected ? styles.rowSelected : ''}`} data-testid={`timeline-object-${id}`}>
       <div className={styles.rowLabel}>
         <span className={styles.swatch} style={{ background: color }} />
         <span className={styles.rowLabelText}>{label}</span>
       </div>
-      <div className={styles.rowTrack}>
+      <div
+        ref={trackRef}
+        className={`${styles.rowTrack} ${styles.rowTrackDraggable}`}
+        onPointerDown={startDrag}
+        data-testid={`timeline-track-${id}`}
+      >
         <div className={styles.bar}>
           {layout.fadeInPct > 0 && (
             <div

@@ -27,6 +27,9 @@ interface EditorStore {
   /** Set by a right-click while in 'area' mode; AreaListPanel reacts to it and clears it when done. */
   pendingAreaPick: { lng: number; lat: number } | null
   setPendingAreaPick: (pick: { lng: number; lat: number } | null) => void
+  /** Set by clicking a Timeline bar — the matching sidebar card highlights/scrolls into view. */
+  selectedObjectId: string | null
+  setSelectedObjectId: (id: string | null) => void
 }
 
 export const useEditorStore = create<EditorStore>((set) => ({
@@ -44,4 +47,6 @@ export const useEditorStore = create<EditorStore>((set) => ({
   setPointInteractionMode: (mode) => set({ pointInteractionMode: mode }),
   pendingAreaPick: null,
   setPendingAreaPick: (pick) => set({ pendingAreaPick: pick }),
+  selectedObjectId: null,
+  setSelectedObjectId: (id) => set({ selectedObjectId: id }),
 }))

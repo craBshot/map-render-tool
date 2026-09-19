@@ -77,6 +77,15 @@ async function getCameraWaypoints(
   })
 }
 
+/** The project's raw marker list, read straight from the persisted project state. */
+async function getMarkers(page: import('@playwright/test').Page): Promise<{ id: string; appear: { startSec: number } }[]> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem('map-render-tool:project')
+    if (!raw) return []
+    return JSON.parse(raw).markers
+  })
+}
+
 test('loads without console errors', async ({ page }) => {
   const errors: string[] = []
   page.on('console', (msg) => {
@@ -161,6 +170,48 @@ test('marker: naming it shows a text label layer on the map', async ({ page }) =
   // Clearing the name hides the label again rather than showing an empty string.
   await page.getByRole('textbox', { name: 'Name' }).fill('')
   await expect.poll(async () => (await labelState())?.visibility).not.toBe('visible')
+})
+
+test('timeline: dragging a marker\'s bar changes its startSec, and a plain click selects it', async ({ page }) => {
+  await gotoApp(page)
+
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
+  const [before] = await getMarkers(page)
+  const originalStartSec = before.appear.startSec // default project: 5 (arrival at the last of 2 waypoints, totalSec 7)
+
+  const track = page.locator(`[data-testid="timeline-track-${before.id}"]`)
+  const box = await track.boundingBox()
+  if (!box) throw new Error('timeline track not found')
+
+  // Drag right-to-left (50% -> 20% of track width) so the result stays comfortably within [0, totalSec]
+  // regardless of exactly where startSec started — a shift of -0.3*totalSec (totalSec=7 by default).
+  const y = box.y + box.height / 2
+  await page.mouse.move(box.x + box.width * 0.5, y)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width * 0.35, y, { steps: 4 })
+  await page.mouse.move(box.x + box.width * 0.2, y, { steps: 4 })
+  await page.mouse.up()
+
+  await expect.poll(async () => (await getMarkers(page))[0].appear.startSec).not.toBe(originalStartSec)
+  const [afterDrag] = await getMarkers(page)
+  expect(afterDrag.appear.startSec).toBeCloseTo(originalStartSec - 0.3 * 7, 0)
+
+  // A plain click (down+up at the same point, no movement) selects instead of repositioning —
+  // the matching sidebar card gets a visible highlight (border/box-shadow using --accent).
+  const markerSection = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Marker', exact: true }) })
+  const card = markerSection.locator('input[placeholder]').first().locator('xpath=ancestor::div[2]')
+  const boxShadowBefore = await card.evaluate((el) => getComputedStyle(el).boxShadow)
+
+  await track.click({ position: { x: 5, y: box.height / 2 } })
+  await expect(async () => {
+    const boxShadowAfter = await card.evaluate((el) => getComputedStyle(el).boxShadow)
+    expect(boxShadowAfter).not.toBe(boxShadowBefore)
+    expect(boxShadowAfter).not.toBe('none')
+  }).toPass()
+
+  // The click-to-select must not have also repositioned the bar (startSec unchanged from the drag result).
+  const [afterClick] = await getMarkers(page)
+  expect(afterClick.appear.startSec).toBeCloseTo(afterDrag.appear.startSec, 6)
 })
 
 test('area pick queries Overpass, adds the area, and it survives a style change', async ({ page }) => {
