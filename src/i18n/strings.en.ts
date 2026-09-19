@@ -48,7 +48,9 @@ export const en: typeof de = {
     hideMinor: 'Hide street/POI labels',
   },
   marker: {
-    heading: 'Target marker',
+    heading: 'Markers',
+    name: 'Name',
+    namePlaceholder: '(no name)',
     visible: 'Show marker',
     setToCenter: 'Use map center',
     color: 'Color',
@@ -66,7 +68,10 @@ export const en: typeof de = {
     pulsePeriod: 'Pulse period (s)',
     pulseScale: 'Pulse size',
     pulseStrength: 'Pulse strength (%)',
-    hint: 'Right-click the map to place the marker there directly.',
+    applyToAll: 'Apply style to all',
+    applyToAllHint: 'Copies color, size and pulse to every other marker.',
+    delete: 'Delete',
+    hint: 'Right-click the map to add a marker there.',
   },
   interactionMode: {
     marker: 'Set marker',

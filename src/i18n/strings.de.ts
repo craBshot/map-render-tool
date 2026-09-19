@@ -43,7 +43,9 @@ export const de = {
     hideMinor: 'Straßen- und POI-Namen ausblenden',
   },
   marker: {
-    heading: 'Zielpunkt',
+    heading: 'Marker',
+    name: 'Name',
+    namePlaceholder: '(kein Name)',
     visible: 'Punkt anzeigen',
     setToCenter: 'Kartenmitte übernehmen',
     color: 'Farbe',
@@ -61,7 +63,10 @@ export const de = {
     pulsePeriod: 'Puls-Dauer (s)',
     pulseScale: 'Puls-Größe',
     pulseStrength: 'Puls-Stärke (%)',
-    hint: 'Rechtsklick auf die Karte setzt den Punkt direkt an diese Stelle.',
+    applyToAll: 'Stil auf alle anwenden',
+    applyToAllHint: 'Kopiert Farbe, Größe und Pulsieren auf alle anderen Marker.',
+    delete: 'Löschen',
+    hint: 'Rechtsklick auf die Karte fügt dort einen Marker hinzu.',
   },
   interactionMode: {
     marker: 'Marker setzen',

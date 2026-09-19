@@ -47,6 +47,8 @@ export interface StyleState {
 
 export interface MarkerObject {
   id: string
+  /** Optional label drawn next to the marker on the map (and in exports). */
+  name?: string
   lng: number
   lat: number
   color: string

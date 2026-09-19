@@ -15,7 +15,7 @@ async function gotoApp(page: import('@playwright/test').Page, options: MockExter
   await page.locator('canvas.maplibregl-canvas').waitFor()
 }
 
-/** True if the marker's dot layer exists and is not hidden. */
+/** True if at least one marker's dot layer exists and is not hidden. */
 async function isMarkerVisible(page: import('@playwright/test').Page): Promise<boolean> {
   return page.evaluate(() => {
     const controller = window.__mapController
@@ -23,6 +23,15 @@ async function isMarkerVisible(page: import('@playwright/test').Page): Promise<b
     const dotLayer = controller.map.getStyle().layers.find((l) => l.id.endsWith('-dot'))
     if (!dotLayer) return false
     return controller.map.getLayoutProperty(dotLayer.id, 'visibility') !== 'none'
+  })
+}
+
+/** Number of currently rendered marker dot layers (= number of markers ever placed, right-click never replaces). */
+async function markerDotCount(page: import('@playwright/test').Page): Promise<number> {
+  return page.evaluate(() => {
+    const controller = window.__mapController
+    if (!controller) return 0
+    return controller.map.getStyle().layers.filter((l) => l.id.startsWith('marker-') && l.id.endsWith('-dot')).length
   })
 }
 
@@ -70,17 +79,74 @@ test('loads without console errors', async ({ page }) => {
   expect(errors).toEqual([])
 })
 
-test('right-click sets the marker, and it stays visible after a style change', async ({ page }) => {
+test('right-clicks add markers, which stay visible after a style change', async ({ page }) => {
   await gotoApp(page)
 
   await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
   await expect.poll(() => isMarkerVisible(page)).toBe(true)
+  await expect.poll(() => markerDotCount(page)).toBe(1)
+
+  // A second right-click must add a marker, not replace the first one.
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 260, y: 180 } })
+  await expect.poll(() => markerDotCount(page)).toBe(2)
 
   // setStyle(diff:false) tears the map's layers down and rebuilds them —
   // the known pitfall this must survive.
   await page.selectOption('#mapStyle', 'dark')
   await page.waitForTimeout(300)
   await expect.poll(() => isMarkerVisible(page)).toBe(true)
+  await expect.poll(() => markerDotCount(page)).toBe(2)
+})
+
+test('marker: deleting one from the panel removes its map layers, not just its dot', async ({ page }) => {
+  await gotoApp(page)
+
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 260, y: 180 } })
+  await expect.poll(() => markerDotCount(page)).toBe(2)
+
+  await page.getByRole('button', { name: '✕' }).first().click()
+  await expect.poll(() => markerDotCount(page)).toBe(1)
+
+  // The deleted marker's halo layer (and source) must be gone too, not just its dot —
+  // regression guard for MapController.removeStaleMarkerLayers.
+  const remainingMarkerLayers = await page.evaluate(() => {
+    const controller = window.__mapController
+    if (!controller) return -1
+    return controller.map.getStyle().layers.filter((l) => l.id.startsWith('marker-')).length
+  })
+  expect(remainingMarkerLayers).toBe(3) // one remaining marker × (halo + dot + label)
+})
+
+test('marker: naming it shows a text label layer on the map', async ({ page }) => {
+  await gotoApp(page)
+
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
+  await expect.poll(() => markerDotCount(page)).toBe(1)
+
+  async function labelState(): Promise<{ visibility: string | undefined; text: unknown } | null> {
+    return page.evaluate(() => {
+      const controller = window.__mapController
+      if (!controller) return null
+      const labelLayer = controller.map.getStyle().layers.find((l) => l.id.endsWith('-label'))
+      if (!labelLayer) return null
+      return {
+        visibility: controller.map.getLayoutProperty(labelLayer.id, 'visibility'),
+        text: controller.map.getLayoutProperty(labelLayer.id, 'text-field'),
+      }
+    })
+  }
+
+  // No name yet — the label layer exists (created alongside halo/dot) but stays hidden.
+  await expect.poll(async () => (await labelState())?.visibility).not.toBe('visible')
+
+  await page.getByRole('textbox', { name: 'Name' }).fill('Berghütte')
+  await expect.poll(async () => (await labelState())?.visibility).toBe('visible')
+  expect((await labelState())?.text).toBe('Berghütte')
+
+  // Clearing the name hides the label again rather than showing an empty string.
+  await page.getByRole('textbox', { name: 'Name' }).fill('')
+  await expect.poll(async () => (await labelState())?.visibility).not.toBe('visible')
 })
 
 test('area pick queries Overpass, adds the area, and it survives a style change', async ({ page }) => {
