@@ -9,8 +9,9 @@ import { insertRouteWaypoint, waypointsToStraightLine } from '../../map/routeGeo
 import { routeStateAt } from '../../map/routeAnimation'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
-import { createDefaultMarker, createDefaultRoute, resolveAreaStyle } from '../../state/types'
+import { createDefaultCameraWaypoint, createDefaultMarker, createDefaultRoute, resolveAreaStyle } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
+import { CameraWaypointMarkers } from './CameraWaypointMarkers'
 import { Crosshair } from './Crosshair'
 import { Readout } from './Readout'
 import { RouteWaypointMarkers } from './RouteWaypointMarkers'
@@ -110,6 +111,15 @@ export function MapStage() {
         return
       }
 
+      if (useEditorStore.getState().pointInteractionMode === 'camera') {
+        const zr = controller.toRef(controller.map.getZoom())
+        useProjectStore.getState().setProject((p) => ({
+          ...p,
+          camera: { ...p.camera, waypoints: [...p.camera.waypoints, createDefaultCameraWaypoint(lng, lat, zr)] },
+        }))
+        return
+      }
+
       useProjectStore.getState().setProject((p) => ({
         ...p,
         markers: [...p.markers, createDefaultMarker(lng, lat)],
@@ -193,6 +203,7 @@ export function MapStage() {
         <Crosshair />
         {readout && <Readout lng={readout.lng} lat={readout.lat} zr={readout.zr} />}
         <RouteWaypointMarkers />
+        <CameraWaypointMarkers />
       </div>
     </div>
   )

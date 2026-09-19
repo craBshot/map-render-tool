@@ -21,9 +21,9 @@ interface EditorStore {
   setLocked: (locked: boolean) => void
   controller: MapController | null
   setController: (controller: MapController | null) => void
-  /** What a right-click on the map currently does — set/move the marker, look up an area, or extend the route. */
-  pointInteractionMode: 'marker' | 'area' | 'route'
-  setPointInteractionMode: (mode: 'marker' | 'area' | 'route') => void
+  /** What a right-click on the map currently does — set/move the marker, look up an area, extend the route, or add a camera waypoint. */
+  pointInteractionMode: 'marker' | 'area' | 'route' | 'camera'
+  setPointInteractionMode: (mode: 'marker' | 'area' | 'route' | 'camera') => void
   /** Set by a right-click while in 'area' mode; AreaListPanel reacts to it and clears it when done. */
   pendingAreaPick: { lng: number; lat: number } | null
   setPendingAreaPick: (pick: { lng: number; lat: number } | null) => void

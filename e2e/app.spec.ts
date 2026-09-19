@@ -66,6 +66,17 @@ async function getRouteWaypoints(page: import('@playwright/test').Page): Promise
   })
 }
 
+/** The camera's raw waypoint list, read straight from the persisted project state. */
+async function getCameraWaypoints(
+  page: import('@playwright/test').Page,
+): Promise<{ lng: number; lat: number; zr: number }[]> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem('map-render-tool:project')
+    if (!raw) return []
+    return JSON.parse(raw).camera.waypoints
+  })
+}
+
 test('loads without console errors', async ({ page }) => {
   const errors: string[] = []
   page.on('console', (msg) => {
@@ -220,6 +231,32 @@ test('route: multiple right-clicks set waypoints, calculating via OSRM renders t
   await page.selectOption('#mapStyle', 'dark')
   await page.waitForTimeout(300)
   await expect.poll(() => isRouteVisible(page)).toBe(true)
+})
+
+test('camera: right-clicks in camera mode append waypoints, and playback actually reaches the new one', async ({ page }) => {
+  await gotoApp(page)
+
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 350, y: 200 } })
+  await expect.poll(() => getCameraWaypoints(page)).toHaveLength(3) // 2 default + 1 added
+
+  await expect(page.locator('[data-testid="camera-waypoint-2"]')).toBeVisible()
+  await expect(page.locator('[data-testid="camera-waypoint-2"]').getByText('C', { exact: true })).toBeVisible()
+
+  // Set the new (last) waypoint's hold long enough to sample it reliably mid-playback.
+  await page.locator('[data-testid="camera-waypoint-2"]').getByLabel('Verweilzeit (s)').fill('2')
+  await page.locator('[data-testid="camera-waypoint-2"]').getByLabel('Flugzeit (s)').fill('0.5')
+
+  const [start, , added] = await getCameraWaypoints(page)
+  await page.getByRole('button', { name: 'Vorschau abspielen' }).click()
+  // Total duration is now 1 (hold A) + 4 (travel) + 2 (hold B) + 0.5 (travel) + 2 (hold C) = 9.5s.
+  // Sample mid-way through C's hold (7.5s-9.5s) — playback must actually reach the appended
+  // waypoint, not stop early or silently ignore it.
+  await page.waitForTimeout(8500)
+  const zr = await page.evaluate(() => window.__mapController?.toRef(window.__mapController.map.getZoom()))
+  expect(zr).toBeGreaterThan(Math.min(start.zr, added.zr) - 0.5)
+  expect(zr).toBeLessThan(Math.max(start.zr, added.zr) + 0.5)
 })
 
 test('route: straight-line mode renders without ever calling OSRM', async ({ page }) => {

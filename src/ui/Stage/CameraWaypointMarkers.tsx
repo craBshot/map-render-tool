@@ -1,0 +1,57 @@
+import { useEffect, useState } from 'react'
+import { useEditorStore } from '../../state/editorStore'
+import { useProjectStore } from '../../state/store'
+import { waypointLetter } from '../format'
+import styles from './CameraWaypointMarkers.module.css'
+
+interface Position {
+  x: number
+  y: number
+}
+
+/**
+ * Small dots + letter labels at each camera waypoint, so the CameraPanel
+ * list can be matched up against actual positions on the map — direct
+ * structural copy of RouteWaypointMarkers, same reasoning: pure DOM
+ * overlay, never part of the export canvas, needs no style-reload
+ * handling since it only depends on map.project(), not on any MapLibre
+ * layer.
+ */
+export function CameraWaypointMarkers() {
+  const waypoints = useProjectStore((s) => s.project.camera.waypoints)
+  const controller = useEditorStore((s) => s.controller)
+  const locked = useEditorStore((s) => s.locked)
+  const playing = useEditorStore((s) => s.playing)
+  const [positions, setPositions] = useState<Position[]>([])
+
+  useEffect(() => {
+    if (!controller) {
+      setPositions([])
+      return
+    }
+
+    const update = () => {
+      setPositions(waypoints.map((w) => controller.map.project([w.lng, w.lat])))
+    }
+    update()
+    controller.map.on('move', update)
+    controller.map.on('resize', update)
+    return () => {
+      controller.map.off('move', update)
+      controller.map.off('resize', update)
+    }
+  }, [controller, waypoints])
+
+  if (locked || playing) return null
+
+  return (
+    <>
+      {positions.map((pos, index) => (
+        <div key={index} className={styles.waypoint} style={{ left: pos.x, top: pos.y }}>
+          <span className={styles.dot} />
+          <span className={styles.label}>{waypointLetter(index)}</span>
+        </div>
+      ))}
+    </>
+  )
+}

@@ -1,0 +1,30 @@
+.waypoint {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.dot {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6b3fa0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85);
+}
+
+.label {
+  position: absolute;
+  left: 7px;
+  top: -17px;
+  font: 700 11px system-ui, 'Segoe UI', sans-serif;
+  color: #6b3fa0;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 0 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
