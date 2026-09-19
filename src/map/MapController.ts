@@ -124,7 +124,24 @@ export class MapController {
   }
 
   renderMarkers(markers: RenderedMarker[]): void {
+    this.removeStaleMarkerLayers(markers)
     for (const { marker, frame } of markers) this.renderMarker(marker, frame)
+  }
+
+  /** Removes the source+layers of any marker no longer in the list (e.g. deleted from the panel). */
+  private removeStaleMarkerLayers(markers: RenderedMarker[]): void {
+    if (!this.styleReady) return
+    const currentIds = new Set(markers.map(({ marker }) => `marker-${marker.id}`))
+    const style = this.map.getStyle()
+    if (!style) return
+    for (const layer of style.layers) {
+      if (!layer.id.startsWith('marker-')) continue
+      const sourceId = layer.id.replace(/-(halo|dot|label)$/, '')
+      if (sourceId !== layer.id && !currentIds.has(sourceId)) this.map.removeLayer(layer.id)
+    }
+    for (const sourceId of Object.keys(style.sources ?? {})) {
+      if (sourceId.startsWith('marker-') && !currentIds.has(sourceId)) this.map.removeSource(sourceId)
+    }
   }
 
   renderAreas(areas: RenderedArea[]): void {

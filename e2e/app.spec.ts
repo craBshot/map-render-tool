@@ -98,6 +98,26 @@ test('right-clicks add markers, which stay visible after a style change', async 
   await expect.poll(() => markerDotCount(page)).toBe(2)
 })
 
+test('marker: deleting one from the panel removes its map layers, not just its dot', async ({ page }) => {
+  await gotoApp(page)
+
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 260, y: 180 } })
+  await expect.poll(() => markerDotCount(page)).toBe(2)
+
+  await page.getByRole('button', { name: '✕' }).first().click()
+  await expect.poll(() => markerDotCount(page)).toBe(1)
+
+  // The deleted marker's halo layer (and source) must be gone too, not just its dot —
+  // regression guard for MapController.removeStaleMarkerLayers.
+  const remainingMarkerLayers = await page.evaluate(() => {
+    const controller = window.__mapController
+    if (!controller) return -1
+    return controller.map.getStyle().layers.filter((l) => l.id.startsWith('marker-')).length
+  })
+  expect(remainingMarkerLayers).toBe(2) // one remaining marker × (halo + dot)
+})
+
 test('area pick queries Overpass, adds the area, and it survives a style change', async ({ page }) => {
   await gotoApp(page)
 
