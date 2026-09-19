@@ -1,6 +1,7 @@
 import { createServer, type Server, type ServerResponse } from 'node:http'
 import type { LocalAreaKind } from '../src/map/overpassEnumeration.ts'
 import { queryPoint } from './spatialIndex.ts'
+import { readRawGeometry } from './manifestStore.ts'
 import type { WorkerState } from './fetchLoop.ts'
 
 const VALID_KINDS: ReadonlySet<LocalAreaKind> = new Set([
@@ -24,8 +25,8 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
  * rather than a snapshot so every request sees the fetch loop's latest data
  * without the server needing to know when it changes.
  */
-export function createAreaDbServer(getState: () => WorkerState): Server {
-  return createServer((req, res) => {
+export function createAreaDbServer(getState: () => WorkerState, dataDir: string): Server {
+  return createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? '/', 'http://internal')
 
@@ -40,14 +41,7 @@ export function createAreaDbServer(getState: () => WorkerState): Server {
         const kindsParam = url.searchParams.get('kinds')
         const kinds = kindsParam ? new Set(kindsParam.split(',').filter(isLocalAreaKind)) : undefined
 
-        const areas = queryPoint(getState().index, lng, lat, kinds).map((a) => ({
-          osmType: a.osmType,
-          osmId: a.osmId,
-          name: a.name,
-          kind: a.kind,
-          adminLevel: a.adminLevel,
-          geometry: a.geometry,
-        }))
+        const areas = await queryPoint(getState().index, lng, lat, (entry) => readRawGeometry(dataDir, entry), kinds)
         sendJson(res, 200, { areas })
         return
       }
