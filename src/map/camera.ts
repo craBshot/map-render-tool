@@ -1,6 +1,6 @@
 import maplibregl from 'maplibre-gl'
 import { easeInOutCubic } from '../timeline/ease'
-import type { CameraState } from '../state/types'
+import type { CameraPoint, CameraState, CameraWaypoint } from '../state/types'
 
 export interface CameraFrame {
   center: [number, number]
@@ -10,15 +10,20 @@ export interface CameraFrame {
   pitch: number
 }
 
+/** Below this, a travel leg would zoom/pan too abruptly to read — same floor as the old fixed zoomDurationSec. */
+const MIN_TRAVEL_SEC = 0.5
+
 /**
- * Camera position at zoom-phase progress t (0..1). Pan speed is matched to
- * zoom speed by interpolating screen-space Mercator position rather than
- * lng/lat directly — see CLAUDE.md's known pitfalls.
+ * Camera position interpolated between two points at local progress t
+ * (0..1). Pan speed is matched to zoom speed by interpolating
+ * screen-space Mercator position rather than lng/lat directly — see
+ * CLAUDE.md's known pitfalls. from===to (t ignored) gives a static frame
+ * at that point.
  */
-export function camAt(camera: CameraState, t: number): CameraFrame {
+function camSegmentAt(from: CameraPoint, to: CameraPoint, t: number): CameraFrame {
   const e = easeInOutCubic(Math.min(1, Math.max(0, t)))
-  const z0 = camera.start.zr
-  const z1 = camera.end.zr
+  const z0 = from.zr
+  const z1 = to.zr
   const z = z0 + (z1 - z0) * e
 
   let s = e
@@ -26,10 +31,62 @@ export function camAt(camera: CameraState, t: number): CameraFrame {
     s = (1 - Math.pow(2, -(z - z0))) / (1 - Math.pow(2, -(z1 - z0)))
   }
 
-  const m0 = maplibregl.MercatorCoordinate.fromLngLat([camera.start.lng, camera.start.lat])
-  const m1 = maplibregl.MercatorCoordinate.fromLngLat([camera.end.lng, camera.end.lat])
+  const m0 = maplibregl.MercatorCoordinate.fromLngLat([from.lng, from.lat])
+  const m1 = maplibregl.MercatorCoordinate.fromLngLat([to.lng, to.lat])
   const mc = new maplibregl.MercatorCoordinate(m0.x + (m1.x - m0.x) * s, m0.y + (m1.y - m0.y) * s, 0)
   const ll = mc.toLngLat()
 
   return { center: [ll.lng, ll.lat], zr: z, bearing: 0, pitch: 0 }
+}
+
+function clampedHold(waypoint: CameraWaypoint): number {
+  return Math.max(0, waypoint.holdSec)
+}
+
+function clampedTravel(waypoint: CameraWaypoint): number {
+  return Math.max(MIN_TRAVEL_SEC, waypoint.travelSec)
+}
+
+/** Total duration of the whole camera flight: every waypoint's hold + travel (first waypoint's travel is 0). */
+export function cameraTotalSec(waypoints: CameraWaypoint[]): number {
+  return waypoints.reduce((sum, wp, i) => sum + clampedHold(wp) + (i === 0 ? 0 : clampedTravel(wp)), 0)
+}
+
+/** Static frame at a single point — e.g. CameraPanel's per-waypoint "show" button. */
+export function camStaticAt(point: CameraPoint): CameraFrame {
+  return camSegmentAt(point, point, 0)
+}
+
+/**
+ * Camera frame at absolute project time `sec`. Walks the waypoint chain,
+ * accumulating elapsed hold/travel time, until it finds the segment
+ * (holding at a waypoint, or traveling to the next one) that `sec` falls
+ * into, then delegates to camSegmentAt() for that segment's local
+ * progress. Clamps before the first waypoint and after the last one's hold.
+ */
+export function camAt(camera: CameraState, sec: number): CameraFrame {
+  const wps = camera.waypoints
+  const clamped = Math.max(0, sec)
+  let elapsed = 0
+
+  for (let i = 0; i < wps.length; i++) {
+    const wp = wps[i]
+
+    if (i > 0) {
+      const travel = clampedTravel(wp)
+      if (clamped < elapsed + travel) {
+        return camSegmentAt(wps[i - 1], wp, (clamped - elapsed) / travel)
+      }
+      elapsed += travel
+    }
+
+    const hold = clampedHold(wp)
+    const isLast = i === wps.length - 1
+    if (isLast || clamped < elapsed + hold) {
+      return camStaticAt(wp)
+    }
+    elapsed += hold
+  }
+
+  return camStaticAt(wps[wps.length - 1])
 }

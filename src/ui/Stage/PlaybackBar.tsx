@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { areaStateAt } from '../../map/areaAnimation'
-import { camAt } from '../../map/camera'
+import { camAt, cameraTotalSec } from '../../map/camera'
 import { markerStateAt } from '../../map/markerAnimation'
 import { routeStateAt } from '../../map/routeAnimation'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
 import { resolveAreaStyle } from '../../state/types'
-import { timingTotals, zoomProgressAt } from '../../timeline/timing'
+import type { TimingContext } from '../../timeline/timing'
 import { strings } from '../../i18n'
 import { fmtNum } from '../format'
 import styles from './PlaybackBar.module.css'
@@ -16,8 +16,8 @@ export function PlaybackBar() {
   const playing = useEditorStore((s) => s.playing)
   const locked = useEditorStore((s) => s.locked)
   const playbackTimeSec = useEditorStore((s) => s.playbackTimeSec)
-  const timing = useProjectStore((s) => s.project.camera.timing)
-  const totals = timingTotals(timing)
+  const waypoints = useProjectStore((s) => s.project.camera.waypoints)
+  const totalSec = cameraTotalSec(waypoints)
 
   useEffect(() => () => stop(), [])
 
@@ -25,16 +25,15 @@ export function PlaybackBar() {
     const controller = useEditorStore.getState().controller
     if (!controller) return
     const project = useProjectStore.getState().project
-    const projectTotals = timingTotals(project.camera.timing)
-    const t = zoomProgressAt(sec, project.camera.timing)
+    const timingCtx: TimingContext = { totalSec: cameraTotalSec(project.camera.waypoints) }
     controller.applyFrame(
-      camAt(project.camera, t),
-      project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, projectTotals, sec) })),
+      camAt(project.camera, sec),
+      project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, timingCtx, sec) })),
       project.areas.map((area) => {
         const style = resolveAreaStyle(area.styleId, project.areaStyles)
-        return { area, style, frame: areaStateAt(style, projectTotals, sec) }
+        return { area, style, frame: areaStateAt(style, timingCtx, sec) }
       }),
-      project.route ? { route: project.route, frame: routeStateAt(project.route, projectTotals, sec) } : null,
+      project.route ? { route: project.route, frame: routeStateAt(project.route, sec) } : null,
     )
   }
 
@@ -47,17 +46,15 @@ export function PlaybackBar() {
     const controller = useEditorStore.getState().controller
     if (!controller) return
     const project = useProjectStore.getState().project
-    const projectTotals = timingTotals(project.camera.timing)
-    controller.renderMarkers(project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, projectTotals, null) })))
+    const timingCtx: TimingContext = { totalSec: cameraTotalSec(project.camera.waypoints) }
+    controller.renderMarkers(project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, timingCtx, null) })))
     controller.renderAreas(
       project.areas.map((area) => {
         const style = resolveAreaStyle(area.styleId, project.areaStyles)
-        return { area, style, frame: areaStateAt(style, projectTotals, null) }
+        return { area, style, frame: areaStateAt(style, timingCtx, null) }
       }),
     )
-    controller.renderRoute(
-      project.route ? { route: project.route, frame: routeStateAt(project.route, projectTotals, null) } : null,
-    )
+    controller.renderRoute(project.route ? { route: project.route, frame: routeStateAt(project.route, null) } : null)
   }
 
   function play() {
@@ -65,7 +62,7 @@ export function PlaybackBar() {
       stop()
       return
     }
-    const total = timingTotals(useProjectStore.getState().project.camera.timing).totalSec
+    const total = cameraTotalSec(useProjectStore.getState().project.camera.waypoints)
     const t0 = performance.now()
     useEditorStore.getState().setPlaying(true)
 
@@ -90,7 +87,7 @@ export function PlaybackBar() {
     useEditorStore.getState().setPlaybackTimeSec(0)
   }
 
-  const progressPct = totals.totalSec ? Math.min(100, (playbackTimeSec / totals.totalSec) * 100) : 0
+  const progressPct = totalSec ? Math.min(100, (playbackTimeSec / totalSec) * 100) : 0
 
   return (
     <div className={styles.bar}>
@@ -104,7 +101,7 @@ export function PlaybackBar() {
         <div className={styles.progress} style={{ width: `${progressPct}%` }} />
       </div>
       <div className={styles.time}>
-        {fmtNum(playbackTimeSec, 1)} / {fmtNum(totals.totalSec, 1)} s
+        {fmtNum(playbackTimeSec, 1)} / {fmtNum(totalSec, 1)} s
       </div>
     </div>
   )

@@ -2,7 +2,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import type { MapMouseEvent } from 'maplibre-gl'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { areaStateAt } from '../../map/areaAnimation'
-import { camAt } from '../../map/camera'
+import { camAt, cameraTotalSec } from '../../map/camera'
 import { MapController } from '../../map/MapController'
 import { markerStateAt } from '../../map/markerAnimation'
 import { insertRouteWaypoint, waypointsToStraightLine } from '../../map/routeGeometry'
@@ -10,7 +10,7 @@ import { routeStateAt } from '../../map/routeAnimation'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
 import { createDefaultMarker, createDefaultRoute, resolveAreaStyle } from '../../state/types'
-import { timingTotals } from '../../timeline/timing'
+import type { TimingContext } from '../../timeline/timing'
 import { Crosshair } from './Crosshair'
 import { Readout } from './Readout'
 import { RouteWaypointMarkers } from './RouteWaypointMarkers'
@@ -60,19 +60,17 @@ export function MapStage() {
       style: initialProject.style,
       onStyleReady: () => {
         const current = useProjectStore.getState().project
-        const totals = timingTotals(current.camera.timing)
+        const timingCtx: TimingContext = { totalSec: cameraTotalSec(current.camera.waypoints) }
         controller.renderAreas(
           current.areas.map((area) => ({
             area,
             style: resolveAreaStyle(area.styleId, current.areaStyles),
-            frame: areaStateAt(resolveAreaStyle(area.styleId, current.areaStyles), totals, null),
+            frame: areaStateAt(resolveAreaStyle(area.styleId, current.areaStyles), timingCtx, null),
           })),
         )
-        controller.renderRoute(
-          current.route ? { route: current.route, frame: routeStateAt(current.route, totals, null) } : null,
-        )
+        controller.renderRoute(current.route ? { route: current.route, frame: routeStateAt(current.route, null) } : null)
         controller.renderMarkers(
-          current.markers.map((marker) => ({ marker, frame: markerStateAt(marker, totals, null) })),
+          current.markers.map((marker) => ({ marker, frame: markerStateAt(marker, timingCtx, null) })),
         )
         controller.reorderAreaLayers(current.areas.map((a) => a.id))
       },
@@ -161,36 +159,33 @@ export function MapStage() {
   useEffect(() => {
     const controller = controllerRef.current
     if (!controller) return
-    const totals = timingTotals(project.camera.timing)
+    const timingCtx: TimingContext = { totalSec: cameraTotalSec(project.camera.waypoints) }
     controller.renderMarkers(
-      project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, totals, null) })),
+      project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, timingCtx, null) })),
     )
-  }, [project.markers, project.camera.timing])
+  }, [project.markers, project.camera.waypoints])
 
   // Area content/appearance/order — same static (sec=null) editor treatment as markers.
   useEffect(() => {
     const controller = controllerRef.current
     if (!controller) return
-    const totals = timingTotals(project.camera.timing)
+    const timingCtx: TimingContext = { totalSec: cameraTotalSec(project.camera.waypoints) }
     controller.renderAreas(
       project.areas.map((area) => ({
         area,
         style: resolveAreaStyle(area.styleId, project.areaStyles),
-        frame: areaStateAt(resolveAreaStyle(area.styleId, project.areaStyles), totals, null),
+        frame: areaStateAt(resolveAreaStyle(area.styleId, project.areaStyles), timingCtx, null),
       })),
     )
     controller.reorderAreaLayers(project.areas.map((a) => a.id))
-  }, [project.areas, project.areaStyles, project.camera.timing])
+  }, [project.areas, project.areaStyles, project.camera.waypoints])
 
   // Route content/appearance — same static (sec=null) editor treatment as markers/areas.
   useEffect(() => {
     const controller = controllerRef.current
     if (!controller) return
-    const totals = timingTotals(project.camera.timing)
-    controller.renderRoute(
-      project.route ? { route: project.route, frame: routeStateAt(project.route, totals, null) } : null,
-    )
-  }, [project.route, project.camera.timing])
+    controller.renderRoute(project.route ? { route: project.route, frame: routeStateAt(project.route, null) } : null)
+  }, [project.route])
 
   return (
     <div ref={stageRef} className={styles.stage}>

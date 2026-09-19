@@ -1,4 +1,4 @@
-export const PROJECT_VERSION = 4
+export const PROJECT_VERSION = 5
 
 /**
  * crypto.randomUUID() requires a secure context, but this app must also
@@ -28,14 +28,33 @@ export interface CameraPoint {
   zr: number
 }
 
+export interface CameraWaypoint extends CameraPoint {
+  id: string
+  /** Time to stay here once arrived, before continuing (or before the project ends, for the last waypoint). */
+  holdSec: number
+  /** Time to fly TO this waypoint from the previous one. Unused (always 0) on the first waypoint. */
+  travelSec: number
+}
+
+/** A camera "flight": a chain of waypoints, each held then flown to. Minimum 2 (UI-enforced, not type-enforced). */
 export interface CameraState {
-  start: CameraPoint
-  end: CameraPoint
-  timing: {
-    holdStartSec: number
-    zoomDurationSec: number
-    holdEndSec: number
-  }
+  waypoints: CameraWaypoint[]
+}
+
+/**
+ * Shared appear/hold/disappear timing for "fixed" objects (markers, area
+ * styles) — plain absolute project-seconds, positioned directly rather
+ * than resolved against camera phases (there's no longer one canonical
+ * "the zoom phase" once the camera is a waypoint chain). Routes use a
+ * plain { startSec } instead (see RouteObject) — they don't fade.
+ */
+export interface AppearTiming {
+  startSec: number
+  fadeInSec: number
+  /** undefined = stays visible until the project ends (default). */
+  holdSec?: number
+  /** 0 = no fade-out (default). */
+  fadeOutSec: number
 }
 
 export interface StyleState {
@@ -60,11 +79,7 @@ export interface MarkerObject {
     /** Halo opacity fraction (0..1), not a percentage. */
     strength: number
   }
-  appear: {
-    mode: 'start' | 'zoomStart' | 'zoomEnd' | 'custom'
-    atSec?: number
-    popDurationSec: number
-  }
+  appear: AppearTiming
   visible: boolean
 }
 
@@ -73,10 +88,7 @@ export interface AreaStyle {
   name: string
   fill: { enabled: boolean; color: string; opacity: number }
   outline: { enabled: boolean; color: string; widthPx: number; dashed: boolean }
-  appear: {
-    mode: 'start' | 'zoomStart' | 'zoomEnd' | 'custom'
-    atSec?: number
-    fadeDurationSec: number
+  appear: AppearTiming & {
     // Reserved for a future pulse effect (MapLibre has no built-in polygon
     // pulse primitive like the marker's circle halo) — not implemented yet.
     pulse?: { enabled: boolean; periodSec: number; strength: number }
@@ -120,10 +132,7 @@ export interface RouteObject {
   color: string
   widthPx: number
   visible: boolean
-  appear: {
-    mode: 'start' | 'zoomStart' | 'zoomEnd' | 'custom'
-    atSec?: number
-  }
+  appear: { startSec: number }
   /** 'instant' = shows fully at appear time. 'progressive' = draws in over drawDurationSec. */
   reveal: RouteReveal
   /** Only relevant when reveal === 'progressive'. Fixed draw duration in seconds. */
@@ -166,8 +175,26 @@ export function createDefaultMarker(lng: number, lat: number): MarkerObject {
     color: '#2f6bff',
     sizePx: 9,
     pulse: { enabled: true, periodSec: 1.6, scale: 3.2, strength: 0.45 },
-    appear: { mode: 'zoomEnd', popDurationSec: 0.4 },
+    // startSec 5 = today's default (arrival at the last waypoint) resolved against the default camera below.
+    appear: { startSec: 5, fadeInSec: 0.4, holdSec: undefined, fadeOutSec: 0 },
     visible: true,
+  }
+}
+
+export function createDefaultCameraWaypoint(
+  lng: number,
+  lat: number,
+  zr: number,
+  overrides: Partial<Pick<CameraWaypoint, 'holdSec' | 'travelSec'>> = {},
+): CameraWaypoint {
+  return {
+    id: generateId(),
+    lng,
+    lat,
+    zr,
+    holdSec: 1,
+    travelSec: 3,
+    ...overrides,
   }
 }
 
@@ -177,7 +204,7 @@ export function createDefaultAreaStyle(name: string, overrides: Partial<Omit<Are
     name,
     fill: { enabled: true, color: '#2f6bff', opacity: 0.25 },
     outline: { enabled: true, color: '#2f6bff', widthPx: 2, dashed: false },
-    appear: { mode: 'start', fadeDurationSec: 0.6 },
+    appear: { startSec: 0, fadeInSec: 0.6, holdSec: undefined, fadeOutSec: 0 },
     ...overrides,
   }
 }
@@ -219,7 +246,7 @@ export function createDefaultRoute(waypoints: RouteWaypoint[]): RouteObject {
     color: '#e6572f',
     widthPx: 4,
     visible: true,
-    appear: { mode: 'zoomStart' },
+    appear: { startSec: 1 }, // 1 = today's default (holdStartSec) resolved against the default camera below
     reveal: 'progressive',
     drawDurationSec: 3,
   }
@@ -229,9 +256,10 @@ export function createDefaultProject(): ProjectFile {
   return {
     version: PROJECT_VERSION,
     camera: {
-      start: { lng: 10, lat: 51, zr: 4 },
-      end: { lng: 10, lat: 51, zr: 10 },
-      timing: { holdStartSec: 1, zoomDurationSec: 4, holdEndSec: 2 },
+      waypoints: [
+        createDefaultCameraWaypoint(10, 51, 4, { holdSec: 1, travelSec: 0 }),
+        createDefaultCameraWaypoint(10, 51, 10, { holdSec: 2, travelSec: 4 }),
+      ],
     },
     style: {
       id: 'positron',

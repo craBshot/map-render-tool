@@ -1,28 +1,13 @@
-import type { CameraState } from '../state/types'
-
-export interface TimingTotals {
-  holdStartSec: number
-  zoomDurationSec: number
-  holdEndSec: number
+/** The one piece of camera-agnostic context marker/area appear-timing resolution needs. */
+export interface TimingContext {
   totalSec: number
 }
 
-/** Clamps raw timing values to sane bounds and computes the total duration. */
-export function timingTotals(timing: CameraState['timing']): TimingTotals {
-  const holdStartSec = Math.max(0, timing.holdStartSec)
-  const zoomDurationSec = Math.max(0.5, timing.zoomDurationSec)
-  const holdEndSec = Math.max(0, timing.holdEndSec)
-  return {
-    holdStartSec,
-    zoomDurationSec,
-    holdEndSec,
-    totalSec: holdStartSec + zoomDurationSec + holdEndSec,
-  }
-}
-
-/** Progress through the zoom phase (0..1) for a given elapsed time. */
-export function zoomProgressAt(sec: number, timing: CameraState['timing']): number {
-  const { holdStartSec, zoomDurationSec } = timingTotals(timing)
-  if (sec < holdStartSec) return 0
-  return Math.min(1, (sec - holdStartSec) / zoomDurationSec)
+/** Resolves an object's actual hold duration: the stored value, or "until the project ends" if unset. */
+export function resolveHoldSec(
+  appear: { startSec: number; fadeInSec: number; holdSec?: number },
+  ctx: TimingContext,
+): number {
+  if (appear.holdSec !== undefined) return Math.max(0, appear.holdSec)
+  return Math.max(0, ctx.totalSec - appear.startSec - appear.fadeInSec)
 }

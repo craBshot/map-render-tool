@@ -105,7 +105,10 @@ test('marker: deleting one from the panel removes its map layers, not just its d
   await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 260, y: 180 } })
   await expect.poll(() => markerDotCount(page)).toBe(2)
 
-  await page.getByRole('button', { name: '✕' }).first().click()
+  // Scope to the Marker panel's own section — the camera panel also has ✕ delete
+  // buttons (for waypoints), just disabled at the default 2-waypoint minimum.
+  const markerSection = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Marker', exact: true } ) })
+  await markerSection.getByRole('button', { name: '✕' }).first().click()
   await expect.poll(() => markerDotCount(page)).toBe(1)
 
   // The deleted marker's halo layer (and source) must be gone too, not just its dot —
@@ -204,8 +207,7 @@ test('route: multiple right-clicks set waypoints, calculating via OSRM renders t
   await canvas.click({ button: 'right', position: { x: 200, y: 160 } })
   await canvas.click({ button: 'right', position: { x: 250, y: 130 } })
 
-  // The waypoint list renders each label as a <span> — scope to that tag,
-  // since "Start"/"Ziel" alone also match the camera panel's point labels.
+  // The waypoint list renders each label as a <span>, scoped to that tag.
   await expect(page.locator('span', { hasText: 'Start' })).toBeVisible()
   await expect(page.locator('span', { hasText: 'Zwischenstopp 1' })).toBeVisible()
   await expect(page.locator('span', { hasText: 'Ziel' })).toBeVisible()
@@ -267,9 +269,9 @@ test('route: a third and fourth click insert before the destination, which stays
 test('preview runs and advances the time readout', async ({ page }) => {
   await gotoApp(page)
 
-  await page.fill('#holdStart', '0.2')
-  await page.fill('#zoomDuration', '0.5')
-  await page.fill('#holdEnd', '0.2')
+  await page.locator('[data-testid="camera-waypoint-0"]').getByLabel('Verweilzeit (s)').fill('0.2')
+  await page.locator('[data-testid="camera-waypoint-1"]').getByLabel('Flugzeit (s)').fill('0.5')
+  await page.locator('[data-testid="camera-waypoint-1"]').getByLabel('Verweilzeit (s)').fill('0.2')
   const timeReadout = page.locator('text=/\\d,\\d \\/ 0,9 s/')
 
   await expect(timeReadout).toHaveText('0,0 / 0,9 s')
@@ -287,11 +289,11 @@ test('mp4 export produces a valid file with the correct frame count', async ({ p
   await gotoApp(page)
 
   const holdStart = 0.2
-  const zoomDuration = 0.5 // >= the 0.5s minimum timingTotals() clamps to
+  const zoomDuration = 0.5 // >= the 0.5s minimum camera.ts clamps travel legs to
   const holdEnd = 0.2
-  await page.fill('#holdStart', String(holdStart))
-  await page.fill('#zoomDuration', String(zoomDuration))
-  await page.fill('#holdEnd', String(holdEnd))
+  await page.locator('[data-testid="camera-waypoint-0"]').getByLabel('Verweilzeit (s)').fill(String(holdStart))
+  await page.locator('[data-testid="camera-waypoint-1"]').getByLabel('Flugzeit (s)').fill(String(zoomDuration))
+  await page.locator('[data-testid="camera-waypoint-1"]').getByLabel('Verweilzeit (s)').fill(String(holdEnd))
   const fps = 24
   await page.selectOption('#exportFps', String(fps))
 
@@ -302,8 +304,7 @@ test('mp4 export produces a valid file with the correct frame count', async ({ p
   expect(filePath).toBeTruthy()
   if (!filePath) return
 
-  const expectedFrames =
-    Math.round(holdStart * fps) + Math.max(2, Math.round(zoomDuration * fps)) + Math.round(holdEnd * fps)
+  const expectedFrames = Math.max(1, Math.round((holdStart + zoomDuration + holdEnd) * fps))
 
   try {
     const { stdout } = await execFileAsync('ffprobe', [

@@ -1,4 +1,4 @@
-import { createDefaultAreaStyles, PROJECT_VERSION, type ProjectFile } from './types'
+import { createDefaultAreaStyles, generateId, PROJECT_VERSION, type ProjectFile } from './types'
 
 type Migration = (data: unknown) => unknown
 
@@ -35,6 +35,58 @@ const migrations: Record<number, Migration> = {
       delete route.drawSpeedKmh
     }
     return { ...(data as object), version: 4, route }
+  },
+  // v4 -> v5: camera became a waypoint chain instead of a fixed start/end +
+  // three timing fields; marker/area appear.mode was replaced by plain
+  // absolute-second timing (startSec/fadeInSec/holdSec/fadeOutSec) since
+  // 'zoomStart'/'zoomEnd' no longer name one canonical phase once the
+  // camera can have any number of waypoints. Resolves every old appear
+  // using the OLD mode-resolution logic against the OLD camera timing,
+  // one last time, before those fields are discarded — lossless.
+  4: (data) => {
+    const d = data as {
+      camera: {
+        start: { lng: number; lat: number; zr: number }
+        end: { lng: number; lat: number; zr: number }
+        timing: { holdStartSec: number; zoomDurationSec: number; holdEndSec: number }
+      }
+      markers: Array<Record<string, unknown> & { appear: { mode: string; atSec?: number; popDurationSec: number } }>
+      areaStyles: Array<Record<string, unknown> & { appear: { mode: string; atSec?: number; fadeDurationSec: number } }>
+      route: (Record<string, unknown> & { appear: { mode: string; atSec?: number } }) | null
+    }
+
+    const { holdStartSec, zoomDurationSec, holdEndSec } = d.camera.timing
+    const oldAppearTimeSec = (appear: { mode: string; atSec?: number }): number => {
+      switch (appear.mode) {
+        case 'start':
+          return 0
+        case 'zoomStart':
+          return holdStartSec
+        case 'zoomEnd':
+          return holdStartSec + zoomDurationSec
+        case 'custom':
+          return Math.max(0, appear.atSec ?? 0)
+        default:
+          return 0
+      }
+    }
+
+    const waypoints = [
+      { id: generateId(), ...d.camera.start, holdSec: holdStartSec, travelSec: 0 },
+      { id: generateId(), ...d.camera.end, holdSec: holdEndSec, travelSec: zoomDurationSec },
+    ]
+
+    const markers = d.markers.map((m) => ({
+      ...m,
+      appear: { startSec: oldAppearTimeSec(m.appear), fadeInSec: m.appear.popDurationSec, holdSec: undefined, fadeOutSec: 0 },
+    }))
+    const areaStyles = d.areaStyles.map((s) => ({
+      ...s,
+      appear: { startSec: oldAppearTimeSec(s.appear), fadeInSec: s.appear.fadeDurationSec, holdSec: undefined, fadeOutSec: 0 },
+    }))
+    const route = d.route ? { ...d.route, appear: { startSec: oldAppearTimeSec(d.route.appear) } } : null
+
+    return { ...(data as object), version: 5, camera: { waypoints }, markers, areaStyles, route }
   },
 }
 

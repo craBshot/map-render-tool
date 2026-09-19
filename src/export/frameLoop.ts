@@ -1,11 +1,11 @@
 import { areaStateAt } from '../map/areaAnimation'
-import { camAt } from '../map/camera'
+import { camAt, cameraTotalSec } from '../map/camera'
 import { drawAttribution } from '../map/attribution'
 import type { MapController, RenderedArea, RenderedMarker, RenderedRoute } from '../map/MapController'
 import { markerStateAt } from '../map/markerAnimation'
 import { routeStateAt } from '../map/routeAnimation'
 import { resolveAreaStyle, type ProjectFile } from '../state/types'
-import { timingTotals } from '../timeline/timing'
+import type { TimingContext } from '../timeline/timing'
 import { createImageSequenceSink } from './imageSequenceSink'
 import { createMp4Sink } from './mp4Sink'
 
@@ -40,11 +40,9 @@ export interface RunExportOptions {
 export async function runExport({ controller, project, onProgress, isCancelled }: RunExportOptions): Promise<ExportResult> {
   const { width, height } = project.export.resolution
   const fps = project.export.fps
-  const totals = timingTotals(project.camera.timing)
-  const n0 = Math.round(totals.holdStartSec * fps)
-  const nMove = Math.max(2, Math.round(totals.zoomDurationSec * fps))
-  const n1 = Math.round(totals.holdEndSec * fps)
-  const totalFrames = n0 + nMove + n1
+  const totalSec = cameraTotalSec(project.camera.waypoints)
+  const totalFrames = Math.max(1, Math.round(totalSec * fps))
+  const timingCtx: TimingContext = { totalSec }
 
   const outCanvas = document.createElement('canvas')
   outCanvas.width = width
@@ -68,24 +66,27 @@ export async function runExport({ controller, project, onProgress, isCancelled }
     for (let i = 0; i < totalFrames; i++) {
       if (isCancelled()) throw new ExportCancelledError()
 
-      const t = i < n0 ? 0 : i < n0 + nMove ? (i - n0) / (nMove - 1) : 1
       const sec = i / fps
+      const cameraFrame = camAt(project.camera, sec)
       const markers: RenderedMarker[] = project.markers.map((marker) => ({
         marker,
-        frame: markerStateAt(marker, totals, sec),
+        frame: markerStateAt(marker, timingCtx, sec),
       }))
       const areas: RenderedArea[] = project.areas.map((area) => {
         const style = resolveAreaStyle(area.styleId, project.areaStyles)
-        return { area, style, frame: areaStateAt(style, totals, sec) }
+        return { area, style, frame: areaStateAt(style, timingCtx, sec) }
       })
       const route: RenderedRoute | null = project.route
-        ? { route: project.route, frame: routeStateAt(project.route, totals, sec) }
+        ? { route: project.route, frame: routeStateAt(project.route, sec) }
         : null
-      const key = `${t}|${JSON.stringify(markers.map((m) => m.frame))}|${JSON.stringify(areas.map((a) => a.frame))}|${JSON.stringify(route?.frame)}`
+      // Keyed on the *computed* camera frame, not sec — sec increments every frame even during a
+      // hold, but the camera frame (like marker/area/route frames) stays constant throughout one,
+      // which is what lets held frames skip re-rendering below.
+      const key = `${JSON.stringify(cameraFrame)}|${JSON.stringify(markers.map((m) => m.frame))}|${JSON.stringify(areas.map((a) => a.frame))}|${JSON.stringify(route?.frame)}`
       const changed = key !== lastKey
 
       if (changed) {
-        controller.applyCameraFrame(camAt(project.camera, t))
+        controller.applyCameraFrame(cameraFrame)
         controller.renderAreas(areas)
         controller.renderRoute(route)
         controller.renderMarkers(markers)

@@ -5,7 +5,6 @@ import { strings } from '../../i18n'
 import styles from './panel.module.css'
 
 const MAX_STYLES = 5
-const APPEAR_MODES: AreaStyle['appear']['mode'][] = ['start', 'zoomStart', 'zoomEnd', 'custom']
 
 export function AreaStylePanel() {
   const areaStyles = useProjectStore((s) => s.project.areaStyles)
@@ -144,42 +143,23 @@ export function AreaStylePanel() {
               </>
             )}
 
-            <label className={styles.label}>{t.appear}</label>
-            <select
-              className={styles.select}
-              value={style.appear.mode}
-              onChange={(e) =>
-                updateStyle(style.id, (s) => ({
-                  ...s,
-                  appear: { ...s.appear, mode: e.target.value as AreaStyle['appear']['mode'] },
-                }))
-              }
-            >
-              {APPEAR_MODES.map((mode) => (
-                <option key={mode} value={mode}>
-                  {strings.marker.appearModes[mode]}
-                </option>
-              ))}
-            </select>
             <div className={styles.row}>
-              {style.appear.mode === 'custom' && (
-                <div>
-                  <label className={styles.label}>{t.appearAt}</label>
-                  <input
-                    type="number"
-                    className={styles.input}
-                    min={0}
-                    step={0.1}
-                    value={style.appear.atSec ?? 0}
-                    onChange={(e) =>
-                      updateStyle(style.id, (s) => ({
-                        ...s,
-                        appear: { ...s.appear, atSec: Math.max(0, Number(e.target.value)) },
-                      }))
-                    }
-                  />
-                </div>
-              )}
+              <div>
+                <label className={styles.label}>{t.appearAt}</label>
+                <input
+                  type="number"
+                  className={styles.input}
+                  min={0}
+                  step={0.1}
+                  value={style.appear.startSec}
+                  onChange={(e) =>
+                    updateStyle(style.id, (s) => ({
+                      ...s,
+                      appear: { ...s.appear, startSec: Math.max(0, Number(e.target.value)) },
+                    }))
+                  }
+                />
+              </div>
               <div>
                 <label className={styles.label}>{t.fadeDuration}</label>
                 <input
@@ -187,11 +167,62 @@ export function AreaStylePanel() {
                   className={styles.input}
                   min={0}
                   step={0.1}
-                  value={style.appear.fadeDurationSec}
+                  value={style.appear.fadeInSec}
                   onChange={(e) =>
                     updateStyle(style.id, (s) => ({
                       ...s,
-                      appear: { ...s.appear, fadeDurationSec: Math.max(0, Number(e.target.value)) },
+                      appear: { ...s.appear, fadeInSec: Math.max(0, Number(e.target.value)) },
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={style.appear.holdSec === undefined}
+                onChange={(e) =>
+                  updateStyle(style.id, (s) => ({
+                    ...s,
+                    appear: { ...s.appear, holdSec: e.target.checked ? undefined : 2 },
+                  }))
+                }
+              />
+              {t.holdForever}
+            </label>
+
+            <div className={styles.row}>
+              {style.appear.holdSec !== undefined && (
+                <div>
+                  <label className={styles.label}>{t.holdDuration}</label>
+                  <input
+                    type="number"
+                    className={styles.input}
+                    min={0}
+                    step={0.1}
+                    value={style.appear.holdSec}
+                    onChange={(e) =>
+                      updateStyle(style.id, (s) => ({
+                        ...s,
+                        appear: { ...s.appear, holdSec: Math.max(0, Number(e.target.value)) },
+                      }))
+                    }
+                  />
+                </div>
+              )}
+              <div>
+                <label className={styles.label}>{t.fadeOut}</label>
+                <input
+                  type="number"
+                  className={styles.input}
+                  min={0}
+                  step={0.1}
+                  value={style.appear.fadeOutSec}
+                  onChange={(e) =>
+                    updateStyle(style.id, (s) => ({
+                      ...s,
+                      appear: { ...s.appear, fadeOutSec: Math.max(0, Number(e.target.value)) },
                     }))
                   }
                 />

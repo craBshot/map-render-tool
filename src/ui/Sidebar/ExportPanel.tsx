@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { camAt } from '../../map/camera'
+import { camAt, cameraTotalSec } from '../../map/camera'
 import { markerStateAt } from '../../map/markerAnimation'
 import { downloadBlob } from '../../export/download'
 import { ExportCancelledError, runExport } from '../../export/frameLoop'
@@ -7,7 +7,7 @@ import { isSecureContext } from '../../export/secureContext'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
 import type { ExportFormat, ResolutionPreset } from '../../state/types'
-import { timingTotals } from '../../timeline/timing'
+import type { TimingContext } from '../../timeline/timing'
 import { strings } from '../../i18n'
 import { fmtNum } from '../format'
 import styles from './panel.module.css'
@@ -91,9 +91,10 @@ export function ExportPanel() {
       }
     } finally {
       useEditorStore.getState().setLocked(false)
-      const totals = timingTotals(project.camera.timing)
-      controller.renderMarkers(project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, totals, null) })))
-      controller.applyCameraFrame(camAt(project.camera, 1))
+      const totalSec = cameraTotalSec(project.camera.waypoints)
+      const timingCtx: TimingContext = { totalSec }
+      controller.renderMarkers(project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, timingCtx, null) })))
+      controller.applyCameraFrame(camAt(project.camera, totalSec))
     }
   }
 

@@ -8,7 +8,6 @@ import { strings } from '../../i18n'
 import { describePoint, fmtNum, waypointLetter } from '../format'
 import styles from './panel.module.css'
 
-const APPEAR_MODES: RouteObject['appear']['mode'][] = ['start', 'zoomStart', 'zoomEnd', 'custom']
 const ROUTING_MODES: RoutingMode[] = ['osrm', 'straight']
 const REVEAL_MODES: RouteObject['reveal'][] = ['instant', 'progressive']
 
@@ -241,35 +240,19 @@ export function RoutePanel() {
               </div>
             )}
 
-            <label className={styles.label}>{t.appear}</label>
-            <select
-              className={styles.select}
-              value={route.appear.mode}
-              onChange={(e) =>
-                updateRoute((r) => ({ ...r, appear: { ...r.appear, mode: e.target.value as RouteObject['appear']['mode'] } }))
-              }
-            >
-              {APPEAR_MODES.map((mode) => (
-                <option key={mode} value={mode}>
-                  {strings.marker.appearModes[mode]}
-                </option>
-              ))}
-            </select>
-            {route.appear.mode === 'custom' && (
-              <div>
-                <label className={styles.label}>{t.appearAt}</label>
-                <input
-                  type="number"
-                  className={styles.input}
-                  min={0}
-                  step={0.1}
-                  value={route.appear.atSec ?? 0}
-                  onChange={(e) =>
-                    updateRoute((r) => ({ ...r, appear: { ...r.appear, atSec: Math.max(0, Number(e.target.value)) } }))
-                  }
-                />
-              </div>
-            )}
+            <div>
+              <label className={styles.label}>{t.appearAt}</label>
+              <input
+                type="number"
+                className={styles.input}
+                min={0}
+                step={0.1}
+                value={route.appear.startSec}
+                onChange={(e) =>
+                  updateRoute((r) => ({ ...r, appear: { startSec: Math.max(0, Number(e.target.value)) } }))
+                }
+              />
+            </div>
 
             <div className={styles.btns}>
               <button type="button" className={styles.button} onClick={deleteRoute}>

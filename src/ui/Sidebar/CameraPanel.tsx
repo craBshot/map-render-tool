@@ -1,103 +1,160 @@
-import { camAt } from '../../map/camera'
+import { camStaticAt } from '../../map/camera'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
-import type { CameraPoint } from '../../state/types'
+import { createDefaultCameraWaypoint, type CameraWaypoint } from '../../state/types'
 import { strings } from '../../i18n'
-import { describePoint } from '../format'
+import { describePoint, waypointLetter } from '../format'
 import styles from './panel.module.css'
 
-type Which = 'start' | 'end'
-
 export function CameraPanel() {
-  const camera = useProjectStore((s) => s.project.camera)
+  const waypoints = useProjectStore((s) => s.project.camera.waypoints)
   const setProject = useProjectStore((s) => s.setProject)
   const locked = useEditorStore((s) => s.locked)
   const t = strings.camera
 
-  function capture(which: Which) {
+  function updateWaypoint(id: string, fn: (wp: CameraWaypoint) => CameraWaypoint) {
+    setProject((p) => ({
+      ...p,
+      camera: { ...p.camera, waypoints: p.camera.waypoints.map((wp) => (wp.id === id ? fn(wp) : wp)) },
+    }))
+  }
+
+  function moveWaypoint(index: number, direction: -1 | 1) {
+    setProject((p) => {
+      const target = index + direction
+      if (target < 0 || target >= p.camera.waypoints.length) return p
+      const next = p.camera.waypoints.slice()
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return { ...p, camera: { ...p.camera, waypoints: next } }
+    })
+  }
+
+  function deleteWaypoint(id: string) {
+    setProject((p) => {
+      if (p.camera.waypoints.length <= 2) return p
+      return { ...p, camera: { ...p.camera, waypoints: p.camera.waypoints.filter((wp) => wp.id !== id) } }
+    })
+  }
+
+  function addWaypoint() {
+    const controller = useEditorStore.getState().controller
+    const c = controller?.map.getCenter()
+    const zr = controller ? controller.toRef(controller.map.getZoom()) : 4
+    const last = waypoints[waypoints.length - 1]
+    const lng = c?.lng ?? last?.lng ?? 0
+    const lat = c?.lat ?? last?.lat ?? 0
+    setProject((p) => ({
+      ...p,
+      camera: { ...p.camera, waypoints: [...p.camera.waypoints, createDefaultCameraWaypoint(lng, lat, zr)] },
+    }))
+  }
+
+  function captureCurrentView(id: string) {
     const controller = useEditorStore.getState().controller
     if (!controller) return
     const c = controller.map.getCenter()
-    const point: CameraPoint = { lng: c.lng, lat: c.lat, zr: controller.toRef(controller.map.getZoom()) }
-    setProject((p) => ({ ...p, camera: { ...p.camera, [which]: point } }))
+    const zr = controller.toRef(controller.map.getZoom())
+    updateWaypoint(id, (wp) => ({ ...wp, lng: c.lng, lat: c.lat, zr }))
   }
 
-  function show(which: Which) {
+  function showWaypoint(wp: CameraWaypoint) {
     const controller = useEditorStore.getState().controller
     if (!controller) return
-    controller.applyCameraFrame(camAt(camera, which === 'start' ? 0 : 1))
-  }
-
-  function updateTiming(field: keyof typeof camera.timing, value: number) {
-    setProject((p) => ({ ...p, camera: { ...p.camera, timing: { ...p.camera.timing, [field]: value } } }))
+    controller.applyCameraFrame(camStaticAt(wp))
   }
 
   return (
     <section className={styles.section}>
       <h2 className={styles.heading}>{t.heading}</h2>
       <fieldset className={styles.fieldset} disabled={locked}>
-      {(['start', 'end'] as const).map((which) => (
-        <div className={styles.point} key={which}>
-          <span className={`${styles.pin} ${which === 'end' ? styles.pinEnd : ''}`} />
-          <div>
-            <strong>{t[which]}</strong>
-            <div className={styles.coords}>{describePoint(camera[which].lng, camera[which].lat, camera[which].zr)}</div>
+        <p className={styles.hint}>{t.pickHint}</p>
+
+        {waypoints.map((wp, index) => (
+          <div key={wp.id} className={styles.card} data-testid={`camera-waypoint-${index}`}>
+            <div className={styles.cardHeader}>
+              <span>{waypointLetter(index)}</span>
+              <div className={styles.btns}>
+                <button
+                  type="button"
+                  className={styles.iconButton}
+                  onClick={() => moveWaypoint(index, -1)}
+                  disabled={index === 0}
+                  title={t.moveUp}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className={styles.iconButton}
+                  onClick={() => moveWaypoint(index, 1)}
+                  disabled={index === waypoints.length - 1}
+                  title={t.moveDown}
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  className={styles.iconButton}
+                  onClick={() => deleteWaypoint(wp.id)}
+                  disabled={waypoints.length <= 2}
+                  title={t.deleteWaypoint}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.coords}>{describePoint(wp.lng, wp.lat, wp.zr)}</div>
+
             <div className={styles.btns}>
-              <button type="button" className={styles.button} onClick={() => capture(which)}>
+              <button type="button" className={styles.button} onClick={() => captureCurrentView(wp.id)}>
                 {t.captureCurrentView}
               </button>
-              <button type="button" className={styles.button} onClick={() => show(which)}>
+              <button type="button" className={styles.button} onClick={() => showWaypoint(wp)}>
                 {t.show}
               </button>
             </div>
-          </div>
-        </div>
-      ))}
 
-      <div className={styles.row3}>
-        <div>
-          <label className={styles.label} htmlFor="holdStart">
-            {t.holdStart}
-          </label>
-          <input
-            id="holdStart"
-            type="number"
-            className={styles.input}
-            min={0}
-            step={0.5}
-            value={camera.timing.holdStartSec}
-            onChange={(e) => updateTiming('holdStartSec', Number(e.target.value))}
-          />
+            <div className={styles.row}>
+              {index > 0 && (
+                <div>
+                  <label className={styles.label} htmlFor={`camTravel-${wp.id}`}>
+                    {t.travelSec}
+                  </label>
+                  <input
+                    id={`camTravel-${wp.id}`}
+                    type="number"
+                    className={styles.input}
+                    min={0.5}
+                    step={0.5}
+                    value={wp.travelSec}
+                    onChange={(e) => updateWaypoint(wp.id, (w) => ({ ...w, travelSec: Math.max(0.5, Number(e.target.value)) }))}
+                  />
+                </div>
+              )}
+              <div>
+                <label className={styles.label} htmlFor={`camHold-${wp.id}`}>
+                  {t.holdSec}
+                </label>
+                <input
+                  id={`camHold-${wp.id}`}
+                  type="number"
+                  className={styles.input}
+                  min={0}
+                  step={0.5}
+                  value={wp.holdSec}
+                  onChange={(e) => updateWaypoint(wp.id, (w) => ({ ...w, holdSec: Math.max(0, Number(e.target.value)) }))}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <div className={styles.btns}>
+          <button type="button" className={styles.button} onClick={addWaypoint}>
+            {t.addWaypoint}
+          </button>
         </div>
-        <div>
-          <label className={styles.label} htmlFor="zoomDuration">
-            {t.zoomDuration}
-          </label>
-          <input
-            id="zoomDuration"
-            type="number"
-            className={styles.input}
-            min={0.5}
-            step={0.5}
-            value={camera.timing.zoomDurationSec}
-            onChange={(e) => updateTiming('zoomDurationSec', Number(e.target.value))}
-          />
-        </div>
-        <div>
-          <label className={styles.label} htmlFor="holdEnd">
-            {t.holdEnd}
-          </label>
-          <input
-            id="holdEnd"
-            type="number"
-            className={styles.input}
-            min={0}
-            step={0.5}
-            value={camera.timing.holdEndSec}
-            onChange={(e) => updateTiming('holdEndSec', Number(e.target.value))}
-          />
-        </div>
-      </div>
       </fieldset>
     </section>
   )

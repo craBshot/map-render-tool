@@ -1,4 +1,3 @@
-import type { TimingTotals } from '../timeline/timing'
 import type { RouteObject } from '../state/types'
 
 export interface RouteFrame {
@@ -8,19 +7,6 @@ export interface RouteFrame {
 }
 
 const HIDDEN: RouteFrame = { visible: false, fraction: 0 }
-
-function appearTimeSec(appear: RouteObject['appear'], timing: TimingTotals): number {
-  switch (appear.mode) {
-    case 'start':
-      return 0
-    case 'zoomStart':
-      return timing.holdStartSec
-    case 'zoomEnd':
-      return timing.holdStartSec + timing.zoomDurationSec
-    case 'custom':
-      return Math.max(0, appear.atSec ?? 0)
-  }
-}
 
 /**
  * Route draw state at time sec. sec === null is the static editor preview
@@ -32,12 +18,12 @@ function appearTimeSec(appear: RouteObject['appear'], timing: TimingTotals): num
  * few seconds long and a "realistic" speed would rarely finish drawing
  * within it.
  */
-export function routeStateAt(route: RouteObject | null, timing: TimingTotals, sec: number | null): RouteFrame {
+export function routeStateAt(route: RouteObject | null, sec: number | null): RouteFrame {
   if (!route || !route.visible || !route.geometry) return HIDDEN
 
   if (sec === null) return { visible: true, fraction: 1 }
 
-  const appearAt = appearTimeSec(route.appear, timing)
+  const appearAt = route.appear.startSec
   if (sec < appearAt) return HIDDEN
 
   if (route.reveal === 'instant') return { visible: true, fraction: 1 }

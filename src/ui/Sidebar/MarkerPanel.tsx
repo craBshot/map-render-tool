@@ -4,8 +4,6 @@ import type { MarkerObject } from '../../state/types'
 import { strings } from '../../i18n'
 import styles from './panel.module.css'
 
-const APPEAR_MODES: MarkerObject['appear']['mode'][] = ['start', 'zoomStart', 'zoomEnd', 'custom']
-
 export function MarkerPanel() {
   const markers = useProjectStore((s) => s.project.markers)
   const setProject = useProjectStore((s) => s.setProject)
@@ -119,64 +117,98 @@ export function MarkerPanel() {
               </button>
             </div>
 
-            <label className={styles.label} htmlFor={`markerAppear-${marker.id}`}>
-              {t.appear}
+            <div className={styles.row}>
+              <div>
+                <label className={styles.label} htmlFor={`markerStart-${marker.id}`}>
+                  {t.appearAt}
+                </label>
+                <input
+                  id={`markerStart-${marker.id}`}
+                  type="number"
+                  className={styles.input}
+                  min={0}
+                  step={0.1}
+                  value={marker.appear.startSec}
+                  onChange={(e) =>
+                    updateMarker(marker.id, (m) => ({
+                      ...m,
+                      appear: { ...m.appear, startSec: Math.max(0, Number(e.target.value)) },
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className={styles.label} htmlFor={`markerFadeIn-${marker.id}`}>
+                  {t.popDuration}
+                </label>
+                <input
+                  id={`markerFadeIn-${marker.id}`}
+                  type="number"
+                  className={styles.input}
+                  min={0}
+                  step={0.1}
+                  value={marker.appear.fadeInSec}
+                  onChange={(e) =>
+                    updateMarker(marker.id, (m) => ({
+                      ...m,
+                      appear: { ...m.appear, fadeInSec: Math.max(0, Number(e.target.value)) },
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={marker.appear.holdSec === undefined}
+                onChange={(e) =>
+                  updateMarker(marker.id, (m) => ({
+                    ...m,
+                    appear: { ...m.appear, holdSec: e.target.checked ? undefined : 2 },
+                  }))
+                }
+              />
+              {t.holdForever}
             </label>
-            <select
-              id={`markerAppear-${marker.id}`}
-              className={styles.select}
-              value={marker.appear.mode}
-              onChange={(e) =>
-                updateMarker(marker.id, (m) => ({
-                  ...m,
-                  appear: { ...m.appear, mode: e.target.value as MarkerObject['appear']['mode'] },
-                }))
-              }
-            >
-              {APPEAR_MODES.map((mode) => (
-                <option key={mode} value={mode}>
-                  {t.appearModes[mode]}
-                </option>
-              ))}
-            </select>
 
             <div className={styles.row}>
-              {marker.appear.mode === 'custom' && (
+              {marker.appear.holdSec !== undefined && (
                 <div>
-                  <label className={styles.label} htmlFor={`markerAppearAt-${marker.id}`}>
-                    {t.appearAt}
+                  <label className={styles.label} htmlFor={`markerHold-${marker.id}`}>
+                    {t.holdDuration}
                   </label>
                   <input
-                    id={`markerAppearAt-${marker.id}`}
+                    id={`markerHold-${marker.id}`}
                     type="number"
                     className={styles.input}
                     min={0}
                     step={0.1}
-                    value={marker.appear.atSec ?? 0}
+                    value={marker.appear.holdSec}
                     onChange={(e) =>
                       updateMarker(marker.id, (m) => ({
                         ...m,
-                        appear: { ...m.appear, atSec: Math.max(0, Number(e.target.value)) },
+                        appear: { ...m.appear, holdSec: Math.max(0, Number(e.target.value)) },
                       }))
                     }
                   />
                 </div>
               )}
               <div>
-                <label className={styles.label} htmlFor={`markerPopDuration-${marker.id}`}>
-                  {t.popDuration}
+                <label className={styles.label} htmlFor={`markerFadeOut-${marker.id}`}>
+                  {t.fadeOut}
                 </label>
                 <input
-                  id={`markerPopDuration-${marker.id}`}
+                  id={`markerFadeOut-${marker.id}`}
                   type="number"
                   className={styles.input}
                   min={0}
                   step={0.1}
-                  value={marker.appear.popDurationSec}
+                  value={marker.appear.fadeOutSec}
                   onChange={(e) =>
                     updateMarker(marker.id, (m) => ({
                       ...m,
-                      appear: { ...m.appear, popDurationSec: Math.max(0, Number(e.target.value)) },
+                      appear: { ...m.appear, fadeOutSec: Math.max(0, Number(e.target.value)) },
                     }))
                   }
                 />
