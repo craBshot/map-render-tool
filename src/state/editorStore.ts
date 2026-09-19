@@ -1,5 +1,11 @@
 import { create } from 'zustand'
 import type { MapController } from '../map/MapController'
+import { loadLayoutPrefs, persistLayoutPrefs } from './layoutPersist'
+
+const SIDEBAR_WIDTH_MIN = 260
+const SIDEBAR_WIDTH_MAX = 600
+const TIMELINE_HEIGHT_MIN = 120
+const TIMELINE_HEIGHT_MAX = 500
 
 /**
  * Ephemeral editor/UI state that must never end up in ProjectFile — it has
@@ -30,9 +36,17 @@ interface EditorStore {
   /** Set by clicking a Timeline bar — the matching sidebar card highlights/scrolls into view. */
   selectedObjectId: string | null
   setSelectedObjectId: (id: string | null) => void
+  /** Window-layout preference (not project content) — persisted separately, see layoutPersist.ts. */
+  sidebarWidthPx: number
+  setSidebarWidthPx: (px: number) => void
+  /** null = today's default auto/content-sized height. */
+  timelineHeightPx: number | null
+  setTimelineHeightPx: (px: number | null) => void
 }
 
-export const useEditorStore = create<EditorStore>((set) => ({
+const initialLayout = loadLayoutPrefs()
+
+export const useEditorStore = create<EditorStore>((set, get) => ({
   playbackTimeSec: 0,
   setPlaybackTimeSec: (sec) => set({ playbackTimeSec: sec }),
   playing: false,
@@ -49,4 +63,16 @@ export const useEditorStore = create<EditorStore>((set) => ({
   setPendingAreaPick: (pick) => set({ pendingAreaPick: pick }),
   selectedObjectId: null,
   setSelectedObjectId: (id) => set({ selectedObjectId: id }),
+  sidebarWidthPx: initialLayout.sidebarWidthPx,
+  setSidebarWidthPx: (px) => {
+    const sidebarWidthPx = Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, px))
+    set({ sidebarWidthPx })
+    persistLayoutPrefs({ sidebarWidthPx, timelineHeightPx: get().timelineHeightPx })
+  },
+  timelineHeightPx: initialLayout.timelineHeightPx,
+  setTimelineHeightPx: (px) => {
+    const timelineHeightPx = px === null ? null : Math.min(TIMELINE_HEIGHT_MAX, Math.max(TIMELINE_HEIGHT_MIN, px))
+    set({ timelineHeightPx })
+    persistLayoutPrefs({ sidebarWidthPx: get().sidebarWidthPx, timelineHeightPx })
+  },
 }))
