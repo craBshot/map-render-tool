@@ -115,7 +115,38 @@ test('marker: deleting one from the panel removes its map layers, not just its d
     if (!controller) return -1
     return controller.map.getStyle().layers.filter((l) => l.id.startsWith('marker-')).length
   })
-  expect(remainingMarkerLayers).toBe(2) // one remaining marker × (halo + dot)
+  expect(remainingMarkerLayers).toBe(3) // one remaining marker × (halo + dot + label)
+})
+
+test('marker: naming it shows a text label layer on the map', async ({ page }) => {
+  await gotoApp(page)
+
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
+  await expect.poll(() => markerDotCount(page)).toBe(1)
+
+  async function labelState(): Promise<{ visibility: string | undefined; text: unknown } | null> {
+    return page.evaluate(() => {
+      const controller = window.__mapController
+      if (!controller) return null
+      const labelLayer = controller.map.getStyle().layers.find((l) => l.id.endsWith('-label'))
+      if (!labelLayer) return null
+      return {
+        visibility: controller.map.getLayoutProperty(labelLayer.id, 'visibility'),
+        text: controller.map.getLayoutProperty(labelLayer.id, 'text-field'),
+      }
+    })
+  }
+
+  // No name yet — the label layer exists (created alongside halo/dot) but stays hidden.
+  await expect.poll(async () => (await labelState())?.visibility).not.toBe('visible')
+
+  await page.getByRole('textbox', { name: 'Name' }).fill('Berghütte')
+  await expect.poll(async () => (await labelState())?.visibility).toBe('visible')
+  expect((await labelState())?.text).toBe('Berghütte')
+
+  // Clearing the name hides the label again rather than showing an empty string.
+  await page.getByRole('textbox', { name: 'Name' }).fill('')
+  await expect.poll(async () => (await labelState())?.visibility).not.toBe('visible')
 })
 
 test('area pick queries Overpass, adds the area, and it survives a style change', async ({ page }) => {

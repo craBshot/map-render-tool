@@ -193,6 +193,7 @@ export class MapController {
     const sourceId = `marker-${marker.id}`
     const haloLayerId = `${sourceId}-halo`
     const dotLayerId = `${sourceId}-dot`
+    const labelLayerId = `${sourceId}-label`
     const data = {
       type: 'Feature' as const,
       properties: {},
@@ -214,6 +215,22 @@ export class MapController {
         source: sourceId,
         paint: { 'circle-stroke-color': '#ffffff' },
       })
+      this.map.addLayer({
+        id: labelLayerId,
+        type: 'symbol',
+        source: sourceId,
+        layout: {
+          // Pinned: verified present in all 5 OpenFreeMap styles (positron/liberty/bright/dark/fiord).
+          // MapLibre's own default ('Open Sans Regular') is NOT in that glyph set and would render nothing.
+          'text-font': ['Noto Sans Regular'],
+          'text-size': 13,
+          'text-anchor': 'left',
+          'text-offset': [1.2, 0], // fixed em offset, independent of the animated halo radius — no pulse jitter
+          'text-allow-overlap': true,
+          'text-ignore-placement': true, // visibility should depend only on marker state, not nearby basemap labels
+        },
+        paint: { 'text-color': '#1a1a1a', 'text-halo-color': '#ffffff', 'text-halo-width': 1.4 },
+      })
     } else {
       source.setData(data)
     }
@@ -221,6 +238,12 @@ export class MapController {
     const visibility = frame.visible ? 'visible' : 'none'
     this.map.setLayoutProperty(haloLayerId, 'visibility', visibility)
     this.map.setLayoutProperty(dotLayerId, 'visibility', visibility)
+    const hasLabel = frame.visible && !!marker.name?.trim()
+    this.map.setLayoutProperty(labelLayerId, 'visibility', hasLabel ? 'visible' : 'none')
+    if (hasLabel) {
+      this.map.setLayoutProperty(labelLayerId, 'text-field', marker.name as string)
+      this.map.setPaintProperty(labelLayerId, 'text-opacity', frame.opacity)
+    }
     if (!frame.visible) return
 
     this.map.setPaintProperty(haloLayerId, 'circle-color', marker.color)
