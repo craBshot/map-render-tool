@@ -74,7 +74,7 @@ export async function runExport({ controller, project, onProgress, isCancelled }
       }))
       const areas: RenderedArea[] = project.areas.map((area) => {
         const style = resolveAreaStyle(area.styleId, project.areaStyles)
-        return { area, style, frame: areaStateAt(style, timingCtx, sec) }
+        return { area, style, frame: areaStateAt(area, timingCtx, sec) }
       })
       const route: RenderedRoute | null = project.route
         ? { route: project.route, frame: routeStateAt(project.route, sec) }

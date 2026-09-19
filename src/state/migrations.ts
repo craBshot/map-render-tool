@@ -1,4 +1,4 @@
-import { createDefaultAreaStyles, generateId, PROJECT_VERSION, type ProjectFile } from './types'
+import { generateId, PROJECT_VERSION, type ProjectFile } from './types'
 
 type Migration = (data: unknown) => unknown
 
@@ -9,12 +9,32 @@ type Migration = (data: unknown) => unknown
  * changes so old project files keep loading.
  */
 const migrations: Record<number, Migration> = {
-  // v1 -> v2: added areas/areaStyles (region highlighting).
+  // v1 -> v2: added areas/areaStyles (region highlighting). Seeds the two
+  // default styles in their AT-THE-TIME (v2-v5) shape, appear included —
+  // deliberately NOT createDefaultAreaStyles() from types.ts, which now
+  // returns the CURRENT (v6+) shape with no appear on the style at all.
+  // Reusing that live factory here would seed a shape the later v4->v5
+  // step (which still reads style.appear) can't process.
   1: (data) => ({
     ...(data as object),
     version: 2,
     areas: [],
-    areaStyles: createDefaultAreaStyles(),
+    areaStyles: [
+      {
+        id: generateId(),
+        name: 'Transparent gefüllt',
+        fill: { enabled: true, color: '#2f6bff', opacity: 0.25 },
+        outline: { enabled: true, color: '#2f6bff', widthPx: 2, dashed: false },
+        appear: { mode: 'start', fadeDurationSec: 0.6 },
+      },
+      {
+        id: generateId(),
+        name: 'Gestrichelte Umrandung',
+        fill: { enabled: false, color: '#2f6bff', opacity: 0.25 },
+        outline: { enabled: true, color: '#2f6bff', widthPx: 2, dashed: true },
+        appear: { mode: 'start', fadeDurationSec: 0.6 },
+      },
+    ],
   }),
   // v2 -> v3: added route (single route, drawn progressively).
   2: (data) => ({
@@ -87,6 +107,31 @@ const migrations: Record<number, Migration> = {
     const route = d.route ? { ...d.route, appear: { startSec: oldAppearTimeSec(d.route.appear) } } : null
 
     return { ...(data as object), version: 5, camera: { waypoints }, markers, areaStyles, route }
+  },
+  // v5 -> v6: area appear/hold/fade timing moved from the shared AreaStyle
+  // onto each AreaObject individually — multiple areas sharing one style
+  // used to share one timeline row/one set of timing, which reads wrong
+  // for a per-object timeline. Resolves each area's style's OLD appear
+  // onto the area, losslessly, before AreaStyle.appear is discarded.
+  5: (data) => {
+    const DEFAULT_APPEAR = { startSec: 0, fadeInSec: 0.6, holdSec: undefined, fadeOutSec: 0 }
+    const d = data as {
+      areas: Array<Record<string, unknown> & { styleId: string | null }>
+      areaStyles: Array<Record<string, unknown> & { id: string; appear: unknown }>
+    }
+    const styleById = new Map(d.areaStyles.map((s) => [s.id, s]))
+
+    const areas = d.areas.map((a) => {
+      const style = a.styleId !== null ? styleById.get(a.styleId) : undefined
+      return { ...a, appear: style ? style.appear : DEFAULT_APPEAR }
+    })
+    const areaStyles = d.areaStyles.map((s) => {
+      const rest = { ...s }
+      delete rest.appear
+      return rest
+    })
+
+    return { ...(data as object), version: 6, areas, areaStyles }
   },
 }
 

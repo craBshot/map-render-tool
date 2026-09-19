@@ -66,7 +66,7 @@ export function MapStage() {
           current.areas.map((area) => ({
             area,
             style: resolveAreaStyle(area.styleId, current.areaStyles),
-            frame: areaStateAt(resolveAreaStyle(area.styleId, current.areaStyles), timingCtx, null),
+            frame: areaStateAt(area, timingCtx, null),
           })),
         )
         controller.renderRoute(current.route ? { route: current.route, frame: routeStateAt(current.route, null) } : null)
@@ -184,7 +184,7 @@ export function MapStage() {
       project.areas.map((area) => ({
         area,
         style: resolveAreaStyle(area.styleId, project.areaStyles),
-        frame: areaStateAt(resolveAreaStyle(area.styleId, project.areaStyles), timingCtx, null),
+        frame: areaStateAt(area, timingCtx, null),
       })),
     )
     controller.reorderAreaLayers(project.areas.map((a) => a.id))

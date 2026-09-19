@@ -31,14 +31,34 @@ function oldV4Project(): Record<string, unknown> {
         visible: true,
       },
     ],
-    areas: [],
+    areas: [
+      {
+        id: 'a1',
+        name: 'Test Area',
+        styleId: 's1',
+        geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+        source: { osmType: 'way', osmId: 123 },
+        visible: true,
+      },
+      {
+        id: 'a2',
+        name: 'Unstyled Area',
+        styleId: null,
+        geometry: { type: 'Polygon', coordinates: [[[2, 2], [3, 2], [3, 3], [2, 2]]] },
+        source: { osmType: 'way', osmId: 456 },
+        visible: true,
+      },
+    ],
     areaStyles: [
       {
         id: 's1',
         name: 'Transparent gefüllt',
         fill: { enabled: true, color: '#2f6bff', opacity: 0.25 },
         outline: { enabled: true, color: '#2f6bff', widthPx: 2, dashed: false },
-        appear: { mode: 'start', fadeDurationSec: 0.6 },
+        // Deliberately not 'start'/0.6 (the fallback default's values below) — distinct startSec
+        // so the styled-vs-unstyled tests actually assert different outputs, not the same value
+        // reached via two different code paths.
+        appear: { mode: 'zoomStart', fadeDurationSec: 0.8 },
       },
     ],
     route: null,
@@ -78,7 +98,7 @@ describe('migrate', () => {
 
     const migrated = migrate(v1)
 
-    expect(migrated.version).toBe(5)
+    expect(migrated.version).toBe(6)
     expect(migrated.areas).toEqual([])
     expect(migrated.areaStyles).toHaveLength(2)
     expect(migrated.route).toBeNull()
@@ -90,7 +110,7 @@ describe('migrate', () => {
 
     const migrated = migrate(v2)
 
-    expect(migrated.version).toBe(5)
+    expect(migrated.version).toBe(6)
     expect(migrated.route).toBeNull()
   })
 
@@ -116,7 +136,7 @@ describe('migrate', () => {
 
     const migrated = migrate(v3)
 
-    expect(migrated.version).toBe(5)
+    expect(migrated.version).toBe(6)
     expect(migrated.route).not.toHaveProperty('profile')
     expect(migrated.route).not.toHaveProperty('drawSpeedKmh')
     expect(migrated.route?.drawDurationSec).toBe(3)
@@ -127,7 +147,7 @@ describe('migrate', () => {
   it('migrates a v3 project with no route (route: null) to the current version', () => {
     const v3 = { ...oldV4Project(), version: 3, route: null }
     const migrated = migrate(v3)
-    expect(migrated.version).toBe(5)
+    expect(migrated.version).toBe(6)
     expect(migrated.route).toBeNull()
   })
 
@@ -159,21 +179,42 @@ describe('migrate', () => {
       expect(migrated.markers[0].appear.startSec).toBe(2.5)
     })
 
-    it('maps area style fadeDurationSec to fadeInSec, losslessly', () => {
-      const migrated = migrate(oldV4Project())
-      expect(migrated.areaStyles[0].appear).toEqual({ startSec: 0, fadeInSec: 0.6, holdSec: undefined, fadeOutSec: 0 })
-    })
-
-    it('every migrated marker/area appear has holdSec undefined and fadeOutSec 0 (lossless: stays visible exactly as before)', () => {
+    it('every migrated marker appear has holdSec undefined and fadeOutSec 0 (lossless: stays visible exactly as before)', () => {
       const migrated = migrate(oldV4Project())
       expect(migrated.markers[0].appear.holdSec).toBeUndefined()
       expect(migrated.markers[0].appear.fadeOutSec).toBe(0)
-      expect(migrated.areaStyles[0].appear.holdSec).toBeUndefined()
-      expect(migrated.areaStyles[0].appear.fadeOutSec).toBe(0)
+    })
+  })
+
+  describe('v5 -> v6: area appear timing moved from the shared style to each area', () => {
+    it("gives a styled area its style's exact old appear (fadeDurationSec -> fadeInSec, losslessly)", () => {
+      const migrated = migrate(oldV4Project())
+      const a1 = migrated.areas.find((a) => a.id === 'a1')
+      // zoomStart resolved against holdStartSec=1 — distinct from the 0/0.6 default below.
+      expect(a1?.appear).toEqual({ startSec: 1, fadeInSec: 0.8, holdSec: undefined, fadeOutSec: 0 })
     })
 
-    it('bumps the version to 5', () => {
-      expect(migrate(oldV4Project()).version).toBe(5)
+    it('gives an unstyled (styleId: null) area the default appear', () => {
+      const migrated = migrate(oldV4Project())
+      const a2 = migrated.areas.find((a) => a.id === 'a2')
+      expect(a2?.appear).toEqual({ startSec: 0, fadeInSec: 0.6, holdSec: undefined, fadeOutSec: 0 })
+    })
+
+    it('falls back to the default appear when styleId points at a missing style (defensive)', () => {
+      const data = oldV4Project()
+      ;(data.areas as Array<Record<string, unknown>>)[0].styleId = 'does-not-exist'
+      const migrated = migrate(data)
+      const a1 = migrated.areas.find((a) => a.id === 'a1')
+      expect(a1?.appear).toEqual({ startSec: 0, fadeInSec: 0.6, holdSec: undefined, fadeOutSec: 0 })
+    })
+
+    it('strips appear off every migrated areaStyles entry', () => {
+      const migrated = migrate(oldV4Project())
+      expect(migrated.areaStyles[0]).not.toHaveProperty('appear')
+    })
+
+    it('bumps the version to 6', () => {
+      expect(migrate(oldV4Project()).version).toBe(6)
     })
   })
 })

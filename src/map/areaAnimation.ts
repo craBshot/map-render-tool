@@ -1,33 +1,28 @@
 import { easeOutQuad } from '../timeline/ease'
 import { resolveHoldSec, type TimingContext } from '../timeline/timing'
-import type { AreaStyle } from '../state/types'
+import type { AreaObject } from '../state/types'
 
 export interface AreaFrame {
   visible: boolean
   opacity: number
 }
 
-const HIDDEN: AreaFrame = { visible: false, opacity: 0 }
-
 /**
- * Area fade-in/hold/fade-out state at time sec. Appear timing lives on the
- * style, not the area, so this takes the resolved style rather than the
- * AreaObject — style === null means "no style assigned" (in the list, not
- * highlighted). sec === null is the static editor preview (fully visible,
- * no gating).
+ * Area fade-in/hold/fade-out state at time sec. sec === null is the static
+ * editor preview (fully visible, no gating). Visibility gating on
+ * area.visible / styleId !== null happens in MapController, not here —
+ * this only computes the appear-timing curve.
  */
-export function areaStateAt(style: AreaStyle | null, ctx: TimingContext, sec: number | null): AreaFrame {
-  if (!style) return HIDDEN
-
+export function areaStateAt(area: AreaObject, ctx: TimingContext, sec: number | null): AreaFrame {
   if (sec === null) return { visible: true, opacity: 1 }
 
-  const appearAt = style.appear.startSec
+  const appearAt = area.appear.startSec
   if (sec < appearAt) return { visible: true, opacity: 0 }
 
-  const fadeIn = style.appear.fadeInSec
-  const hold = resolveHoldSec(style.appear, ctx)
+  const fadeIn = area.appear.fadeInSec
+  const hold = resolveHoldSec(area.appear, ctx)
   const fadeOutStart = appearAt + fadeIn + hold
-  const fadeOut = style.appear.fadeOutSec
+  const fadeOut = area.appear.fadeOutSec
 
   // <= (not <): see markerAnimation.ts's identical note — the default
   // holdSec===undefined makes fadeOutStart===ctx.totalSec exactly, and the

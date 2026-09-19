@@ -89,6 +89,11 @@ export const en: typeof de = {
     moveUp: 'Move up',
     moveDown: 'Move down',
     delete: 'Delete',
+    appearAt: 'Appears at (s)',
+    fadeDuration: 'Fade in (s)',
+    holdForever: 'Stay visible until the end',
+    holdDuration: 'Hold duration (s)',
+    fadeOut: 'Fade out (s)',
     kinds: {
       administrative: 'Administrative area',
       protected_area: 'Protected area',
@@ -115,11 +120,6 @@ export const en: typeof de = {
     outlineColor: 'Line color',
     outlineWidth: 'Line width (px)',
     outlineDashed: 'Dashed',
-    appearAt: 'Appears at (s)',
-    fadeDuration: 'Fade in (s)',
-    holdForever: 'Stay visible until the end',
-    holdDuration: 'Hold duration (s)',
-    fadeOut: 'Fade out (s)',
   },
   areaTypeSettings: {
     heading: 'Area types',

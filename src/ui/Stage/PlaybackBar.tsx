@@ -31,7 +31,7 @@ export function PlaybackBar() {
       project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, timingCtx, sec) })),
       project.areas.map((area) => {
         const style = resolveAreaStyle(area.styleId, project.areaStyles)
-        return { area, style, frame: areaStateAt(style, timingCtx, sec) }
+        return { area, style, frame: areaStateAt(area, timingCtx, sec) }
       }),
       project.route ? { route: project.route, frame: routeStateAt(project.route, sec) } : null,
     )
@@ -51,7 +51,7 @@ export function PlaybackBar() {
     controller.renderAreas(
       project.areas.map((area) => {
         const style = resolveAreaStyle(area.styleId, project.areaStyles)
-        return { area, style, frame: areaStateAt(style, timingCtx, null) }
+        return { area, style, frame: areaStateAt(area, timingCtx, null) }
       }),
     )
     controller.renderRoute(project.route ? { route: project.route, frame: routeStateAt(project.route, null) } : null)

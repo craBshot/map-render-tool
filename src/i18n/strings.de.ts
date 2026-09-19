@@ -84,6 +84,11 @@ export const de = {
     moveUp: 'Nach oben',
     moveDown: 'Nach unten',
     delete: 'Löschen',
+    appearAt: 'Erscheint bei (s)',
+    fadeDuration: 'Einblenden (s)',
+    holdForever: 'Bis zum Ende sichtbar bleiben',
+    holdDuration: 'Verweildauer (s)',
+    fadeOut: 'Ausblenden (s)',
     kinds: {
       administrative: 'Verwaltungsgebiet',
       protected_area: 'Schutzgebiet',
@@ -110,11 +115,6 @@ export const de = {
     outlineColor: 'Linienfarbe',
     outlineWidth: 'Linienbreite (px)',
     outlineDashed: 'Gestrichelt',
-    appearAt: 'Erscheint bei (s)',
-    fadeDuration: 'Einblenden (s)',
-    holdForever: 'Bis zum Ende sichtbar bleiben',
-    holdDuration: 'Verweildauer (s)',
-    fadeOut: 'Ausblenden (s)',
   },
   areaTypeSettings: {
     heading: 'Gebietstypen',

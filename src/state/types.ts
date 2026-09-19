@@ -1,4 +1,4 @@
-export const PROJECT_VERSION = 5
+export const PROJECT_VERSION = 6
 
 /**
  * crypto.randomUUID() requires a secure context, but this app must also
@@ -88,11 +88,6 @@ export interface AreaStyle {
   name: string
   fill: { enabled: boolean; color: string; opacity: number }
   outline: { enabled: boolean; color: string; widthPx: number; dashed: boolean }
-  appear: AppearTiming & {
-    // Reserved for a future pulse effect (MapLibre has no built-in polygon
-    // pulse primitive like the marker's circle halo) — not implemented yet.
-    pulse?: { enabled: boolean; periodSec: number; strength: number }
-  }
 }
 
 export interface AreaObject {
@@ -105,6 +100,11 @@ export interface AreaObject {
   /** Provenance only — never re-fetched from this. */
   source: { osmType: 'way' | 'relation'; osmId: number }
   visible: boolean
+  appear: AppearTiming & {
+    // Reserved for a future pulse effect (MapLibre has no built-in polygon
+    // pulse primitive like the marker's circle halo) — not implemented yet.
+    pulse?: { enabled: boolean; periodSec: number; strength: number }
+  }
 }
 
 export function resolveAreaStyle(styleId: string | null, styles: AreaStyle[]): AreaStyle | null {
@@ -204,7 +204,6 @@ export function createDefaultAreaStyle(name: string, overrides: Partial<Omit<Are
     name,
     fill: { enabled: true, color: '#2f6bff', opacity: 0.25 },
     outline: { enabled: true, color: '#2f6bff', widthPx: 2, dashed: false },
-    appear: { startSec: 0, fadeInSec: 0.6, holdSec: undefined, fadeOutSec: 0 },
     ...overrides,
   }
 }
@@ -233,6 +232,7 @@ export function createDefaultArea(
     geometry,
     source,
     visible: true,
+    appear: { startSec: 0, fadeInSec: 0.6, holdSec: undefined, fadeOutSec: 0 },
   }
 }
 

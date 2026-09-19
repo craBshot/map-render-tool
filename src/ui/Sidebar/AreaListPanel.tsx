@@ -203,6 +203,104 @@ export function AreaListPanel() {
                 </label>
               ))}
             </div>
+
+            <div className={styles.row}>
+              <div>
+                <label className={styles.label} htmlFor={`areaStart-${area.id}`}>
+                  {t.appearAt}
+                </label>
+                <input
+                  id={`areaStart-${area.id}`}
+                  type="number"
+                  className={styles.input}
+                  min={0}
+                  step={0.1}
+                  value={area.appear.startSec}
+                  onChange={(e) =>
+                    updateArea(area.id, (a) => ({
+                      ...a,
+                      appear: { ...a.appear, startSec: Math.max(0, Number(e.target.value)) },
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className={styles.label} htmlFor={`areaFadeIn-${area.id}`}>
+                  {t.fadeDuration}
+                </label>
+                <input
+                  id={`areaFadeIn-${area.id}`}
+                  type="number"
+                  className={styles.input}
+                  min={0}
+                  step={0.1}
+                  value={area.appear.fadeInSec}
+                  onChange={(e) =>
+                    updateArea(area.id, (a) => ({
+                      ...a,
+                      appear: { ...a.appear, fadeInSec: Math.max(0, Number(e.target.value)) },
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={area.appear.holdSec === undefined}
+                onChange={(e) =>
+                  updateArea(area.id, (a) => ({
+                    ...a,
+                    appear: { ...a.appear, holdSec: e.target.checked ? undefined : 2 },
+                  }))
+                }
+              />
+              {t.holdForever}
+            </label>
+
+            <div className={styles.row}>
+              {area.appear.holdSec !== undefined && (
+                <div>
+                  <label className={styles.label} htmlFor={`areaHold-${area.id}`}>
+                    {t.holdDuration}
+                  </label>
+                  <input
+                    id={`areaHold-${area.id}`}
+                    type="number"
+                    className={styles.input}
+                    min={0}
+                    step={0.1}
+                    value={area.appear.holdSec}
+                    onChange={(e) =>
+                      updateArea(area.id, (a) => ({
+                        ...a,
+                        appear: { ...a.appear, holdSec: Math.max(0, Number(e.target.value)) },
+                      }))
+                    }
+                  />
+                </div>
+              )}
+              <div>
+                <label className={styles.label} htmlFor={`areaFadeOut-${area.id}`}>
+                  {t.fadeOut}
+                </label>
+                <input
+                  id={`areaFadeOut-${area.id}`}
+                  type="number"
+                  className={styles.input}
+                  min={0}
+                  step={0.1}
+                  value={area.appear.fadeOutSec}
+                  onChange={(e) =>
+                    updateArea(area.id, (a) => ({
+                      ...a,
+                      appear: { ...a.appear, fadeOutSec: Math.max(0, Number(e.target.value)) },
+                    }))
+                  }
+                />
+              </div>
+            </div>
           </div>
         ))}
       </fieldset>
