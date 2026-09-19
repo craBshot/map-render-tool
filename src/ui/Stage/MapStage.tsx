@@ -114,10 +114,7 @@ export function MapStage() {
 
       useProjectStore.getState().setProject((p) => ({
         ...p,
-        markers:
-          p.markers.length > 0
-            ? p.markers.map((m, i) => (i === 0 ? { ...m, lng, lat, visible: true } : m))
-            : [createDefaultMarker(lng, lat)],
+        markers: [...p.markers, createDefaultMarker(lng, lat)],
       }))
     }
     controller.map.on('contextmenu', handleContextMenu)

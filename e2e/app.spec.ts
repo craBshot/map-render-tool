@@ -15,7 +15,7 @@ async function gotoApp(page: import('@playwright/test').Page, options: MockExter
   await page.locator('canvas.maplibregl-canvas').waitFor()
 }
 
-/** True if the marker's dot layer exists and is not hidden. */
+/** True if at least one marker's dot layer exists and is not hidden. */
 async function isMarkerVisible(page: import('@playwright/test').Page): Promise<boolean> {
   return page.evaluate(() => {
     const controller = window.__mapController
@@ -23,6 +23,15 @@ async function isMarkerVisible(page: import('@playwright/test').Page): Promise<b
     const dotLayer = controller.map.getStyle().layers.find((l) => l.id.endsWith('-dot'))
     if (!dotLayer) return false
     return controller.map.getLayoutProperty(dotLayer.id, 'visibility') !== 'none'
+  })
+}
+
+/** Number of currently rendered marker dot layers (= number of markers ever placed, right-click never replaces). */
+async function markerDotCount(page: import('@playwright/test').Page): Promise<number> {
+  return page.evaluate(() => {
+    const controller = window.__mapController
+    if (!controller) return 0
+    return controller.map.getStyle().layers.filter((l) => l.id.startsWith('marker-') && l.id.endsWith('-dot')).length
   })
 }
 
@@ -70,17 +79,23 @@ test('loads without console errors', async ({ page }) => {
   expect(errors).toEqual([])
 })
 
-test('right-click sets the marker, and it stays visible after a style change', async ({ page }) => {
+test('right-clicks add markers, which stay visible after a style change', async ({ page }) => {
   await gotoApp(page)
 
   await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
   await expect.poll(() => isMarkerVisible(page)).toBe(true)
+  await expect.poll(() => markerDotCount(page)).toBe(1)
+
+  // A second right-click must add a marker, not replace the first one.
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 260, y: 180 } })
+  await expect.poll(() => markerDotCount(page)).toBe(2)
 
   // setStyle(diff:false) tears the map's layers down and rebuilds them —
   // the known pitfall this must survive.
   await page.selectOption('#mapStyle', 'dark')
   await page.waitForTimeout(300)
   await expect.poll(() => isMarkerVisible(page)).toBe(true)
+  await expect.poll(() => markerDotCount(page)).toBe(2)
 })
 
 test('area pick queries Overpass, adds the area, and it survives a style change', async ({ page }) => {
