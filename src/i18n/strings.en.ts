@@ -22,6 +22,10 @@ export const en: typeof de = {
     stop: 'Stop preview',
     reset: 'Back to start',
   },
+  timeline: {
+    cameraRow: 'Camera flight',
+    routeRow: 'Route',
+  },
   camera: {
     heading: 'Camera flight',
     pickHint: 'Right-click the map in camera mode to add a waypoint.',

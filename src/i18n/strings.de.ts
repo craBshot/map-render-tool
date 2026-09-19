@@ -17,6 +17,10 @@ export const de = {
     stop: 'Vorschau stoppen',
     reset: 'Zum Start',
   },
+  timeline: {
+    cameraRow: 'Kamerafahrt',
+    routeRow: 'Route',
+  },
   camera: {
     heading: 'Kamerafahrt',
     pickHint: 'Rechtsklick im Kamera-Modus fügt einen Wegpunkt hinzu.',
