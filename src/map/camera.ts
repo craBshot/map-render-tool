@@ -57,6 +57,35 @@ export function camStaticAt(point: CameraPoint): CameraFrame {
   return camSegmentAt(point, point, 0)
 }
 
+export interface CameraSegment {
+  waypointId: string
+  kind: 'hold' | 'travel'
+  startSec: number
+  durationSec: number
+}
+
+/**
+ * Ordered list of the discrete hold/travel legs a flight consists of — the
+ * same clamped durations camAt()/cameraTotalSec() use internally, exposed
+ * for visualization (the Timeline's camera row).
+ */
+export function cameraSegments(waypoints: CameraWaypoint[]): CameraSegment[] {
+  const segments: CameraSegment[] = []
+  let elapsed = 0
+  for (let i = 0; i < waypoints.length; i++) {
+    const wp = waypoints[i]
+    if (i > 0) {
+      const durationSec = clampedTravel(wp)
+      segments.push({ waypointId: wp.id, kind: 'travel', startSec: elapsed, durationSec })
+      elapsed += durationSec
+    }
+    const durationSec = clampedHold(wp)
+    segments.push({ waypointId: wp.id, kind: 'hold', startSec: elapsed, durationSec })
+    elapsed += durationSec
+  }
+  return segments
+}
+
 /**
  * Camera frame at absolute project time `sec`. Walks the waypoint chain,
  * accumulating elapsed hold/travel time, until it finds the segment
