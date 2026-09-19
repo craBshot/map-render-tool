@@ -5,7 +5,7 @@ import { createAreaDbServer } from './server.ts'
 
 let state = await loadInitialState(DATA_DIR)
 
-const server = createAreaDbServer(() => state)
+const server = createAreaDbServer(() => state, DATA_DIR)
 server.listen(HTTP_PORT, () => {
   console.log(`[area-db-worker] listening on :${HTTP_PORT}, data dir ${DATA_DIR}`)
 })

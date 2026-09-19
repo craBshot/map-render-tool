@@ -51,7 +51,7 @@ export async function storeArea(
   dataDir: string,
   properties: Omit<ManifestEntry, 'bbox' | 'file'>,
   geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon,
-): Promise<void> {
+): Promise<ManifestEntry> {
   const bbox = computeBbox(geometry)
   const file = rawFileName(properties.osmType, properties.osmId)
   const feature: RawFeature = { type: 'Feature', geometry, properties }
@@ -61,6 +61,7 @@ export async function storeArea(
 
   const entry: ManifestEntry = { ...properties, bbox, file }
   await appendFile(join(dataDir, 'manifest.ndjson'), `${JSON.stringify(entry)}\n`, 'utf8')
+  return entry
 }
 
 /** Reads the whole manifest into memory — fine at this project's scale (thousands, not millions, of entries). */

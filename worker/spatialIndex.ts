@@ -1,25 +1,33 @@
 import { polygonContainsPoint } from '../src/map/overpassGeometry.ts'
 import type { LocalAreaKind } from '../src/map/overpassEnumeration.ts'
+import type { ManifestEntry } from './manifestStore.ts'
 
 /**
  * Grid-bucketed point-in-polygon index over the locally stored areas.
- * Pure/in-memory — the worker rebuilds this from disk once at startup (and
- * after every successful fetch), no persistence of its own.
+ * Pure/in-memory — the worker rebuilds this from the manifest once at
+ * startup (and after every successful fetch), no persistence of its own.
+ *
+ * Holds only metadata (bbox etc.), never geometry: at this dataset's scale
+ * (tens of thousands of areas, some with multi-MB boundaries) keeping every
+ * geometry resident permanently doesn't fit in memory. `queryPoint` loads
+ * geometry lazily, only for the handful of candidates a given point's grid
+ * cell and bbox actually narrow it down to.
  */
 
-export interface IndexedArea {
-  osmType: 'way' | 'relation'
+export interface SpatialIndex {
+  cellSizeDeg: number
+  cells: Map<string, ManifestEntry[]>
+}
+
+export type GeometryLoader = (entry: ManifestEntry) => Promise<GeoJSON.Polygon | GeoJSON.MultiPolygon>
+
+export interface AreaMatch {
+  osmType: ManifestEntry['osmType']
   osmId: number
   name: string
   kind: LocalAreaKind
   adminLevel?: number
-  bbox: [number, number, number, number]
   geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon
-}
-
-export interface SpatialIndex {
-  cellSizeDeg: number
-  cells: Map<string, IndexedArea[]>
 }
 
 const DEFAULT_CELL_SIZE_DEG = 0.5
@@ -41,37 +49,49 @@ function cellRangeForBbox(bbox: [number, number, number, number], cellSizeDeg: n
   return cells
 }
 
-export function buildSpatialIndex(areas: IndexedArea[], cellSizeDeg = DEFAULT_CELL_SIZE_DEG): SpatialIndex {
-  const cells = new Map<string, IndexedArea[]>()
-  for (const area of areas) {
-    for (const [x, y] of cellRangeForBbox(area.bbox, cellSizeDeg)) {
+export function buildSpatialIndex(entries: ManifestEntry[], cellSizeDeg = DEFAULT_CELL_SIZE_DEG): SpatialIndex {
+  const cells = new Map<string, ManifestEntry[]>()
+  for (const entry of entries) {
+    for (const [x, y] of cellRangeForBbox(entry.bbox, cellSizeDeg)) {
       const key = cellKey(x, y)
       const bucket = cells.get(key)
-      if (bucket) bucket.push(area)
-      else cells.set(key, [area])
+      if (bucket) bucket.push(entry)
+      else cells.set(key, [entry])
     }
   }
   return { cellSizeDeg, cells }
 }
 
-/** All indexed areas (optionally restricted to `kinds`) whose polygon actually contains (lng, lat). */
-export function queryPoint(
+/**
+ * All indexed areas (optionally restricted to `kinds`) whose polygon actually contains (lng, lat).
+ * `loadGeometry` is only called for entries that already pass the cheap kind/bbox pre-filter.
+ */
+export async function queryPoint(
   index: SpatialIndex,
   lng: number,
   lat: number,
+  loadGeometry: GeometryLoader,
   kinds?: ReadonlySet<LocalAreaKind>,
-): IndexedArea[] {
+): Promise<AreaMatch[]> {
   const x = Math.floor(lng / index.cellSizeDeg)
   const y = Math.floor(lat / index.cellSizeDeg)
   const candidates = index.cells.get(cellKey(x, y)) ?? []
 
-  const results: IndexedArea[] = []
-  for (const area of candidates) {
-    if (kinds && !kinds.has(area.kind)) continue
-    const [minLng, minLat, maxLng, maxLat] = area.bbox
+  const results: AreaMatch[] = []
+  for (const entry of candidates) {
+    if (kinds && !kinds.has(entry.kind)) continue
+    const [minLng, minLat, maxLng, maxLat] = entry.bbox
     if (lng < minLng || lng > maxLng || lat < minLat || lat > maxLat) continue
-    if (!polygonContainsPoint(area.geometry, [lng, lat])) continue
-    results.push(area)
+    const geometry = await loadGeometry(entry)
+    if (!polygonContainsPoint(geometry, [lng, lat])) continue
+    results.push({
+      osmType: entry.osmType,
+      osmId: entry.osmId,
+      name: entry.name,
+      kind: entry.kind,
+      adminLevel: entry.adminLevel,
+      geometry,
+    })
   }
   return results
 }
