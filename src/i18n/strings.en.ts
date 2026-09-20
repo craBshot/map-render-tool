@@ -197,4 +197,10 @@ export const en: typeof de = {
     doneMp4: (seconds: string, mb: string) => `Done: ${seconds}s video, ${mb} MB. Import directly into DaVinci.`,
     doneImages: (count: number, mb: string) => `Done: ${count} images, ${mb} MB. Import the unzipped folder into DaVinci as an image sequence.`,
   },
+  project: {
+    heading: 'Project',
+    reset: 'Reset project',
+    resetHint: 'Removes all markers, areas and the route, resets the camera flight to its default.',
+    resetConfirm: 'Really reset everything? Markers, areas, route and camera flight will be lost permanently.',
+  },
 }

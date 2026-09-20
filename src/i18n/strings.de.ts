@@ -192,4 +192,10 @@ export const de = {
     doneMp4: (seconds: string, mb: string) => `Fertig: ${seconds} s Video, ${mb} MB. Direkt in DaVinci importieren.`,
     doneImages: (count: number, mb: string) => `Fertig: ${count} Bilder, ${mb} MB. In DaVinci den entpackten Ordner als Bildsequenz importieren.`,
   },
+  project: {
+    heading: 'Projekt',
+    reset: 'Projekt zurücksetzen',
+    resetHint: 'Entfernt alle Marker, Gebiete und die Route, setzt die Kamerafahrt auf den Standard zurück.',
+    resetConfirm: 'Wirklich alles zurücksetzen? Marker, Gebiete, Route und Kamerafahrt gehen unwiderruflich verloren.',
+  },
 }

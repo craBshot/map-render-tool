@@ -414,3 +414,34 @@ test('mp4 export produces a valid file with the correct frame count', async ({ p
     expect(statSync(filePath).size).toBeGreaterThan(1000)
   }
 })
+
+test('project: reset clears markers/areas/route and restores the default camera, after confirming', async ({ page }) => {
+  await gotoApp(page)
+
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
+  await expect.poll(() => markerDotCount(page)).toBe(1)
+
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 150, y: 120 } })
+  await canvas.click({ button: 'right', position: { x: 250, y: 130 } })
+  await expect.poll(() => getRouteWaypoints(page)).toHaveLength(2)
+
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
+  await canvas.click({ button: 'right', position: { x: 300, y: 300 } })
+  await expect.poll(() => getCameraWaypoints(page)).toHaveLength(3)
+
+  // Dismissing the confirm dialog must leave everything untouched.
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await page.getByRole('button', { name: 'Projekt zurücksetzen' }).click()
+  await page.waitForTimeout(150)
+  expect(await markerDotCount(page)).toBe(1)
+  expect(await getCameraWaypoints(page)).toHaveLength(3)
+
+  // Accepting it clears markers/areas/route and restores the 2-waypoint default camera.
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Projekt zurücksetzen' }).click()
+  await expect.poll(() => markerDotCount(page)).toBe(0)
+  await expect.poll(() => getRouteWaypoints(page)).toEqual([])
+  await expect.poll(() => getCameraWaypoints(page)).toHaveLength(2)
+})
