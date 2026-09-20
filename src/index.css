@@ -7,6 +7,20 @@
   --accent: #2f6bff;
   --accent-ink: #ffffff;
   --warn: #b4442e;
+
+  /* Per-interaction-mode color language (Sidebar chrome + new-object defaults, see
+     state/types.ts's createDefault* functions) — kept independent of --accent/--warn even
+     where a hue is close, so a mode color never doubles as "this is an error" or "this is
+     just a generic active-state" by coincidence. */
+  --mode-marker: #d64545;
+  --mode-marker-bg: #fdecea;
+  --mode-route: #2f6bff; /* = --accent: route is "the blue one", matching the app's existing primary color */
+  --mode-route-bg: #eaf1ff;
+  --mode-area: #2f9e5c;
+  --mode-area-bg: #eaf7f0;
+  --mode-camera: #6b3fa0; /* = TimelineCameraRow.tsx's CAMERA_COLOR */
+  --mode-camera-bg: #f2ecf9;
+
   --font: system-ui, 'Segoe UI', Roboto, sans-serif;
   --font-head: var(--font);
 

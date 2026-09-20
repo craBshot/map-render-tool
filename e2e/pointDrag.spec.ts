@@ -255,18 +255,16 @@ async function boxShadow(page: import('@playwright/test').Page, locator: ReturnT
   return locator.evaluate((el) => getComputedStyle(el).boxShadow)
 }
 
-test('double-clicking a marker opens the Marker section (collapsed by default) and selects it', async ({ page }) => {
+test('double-clicking a marker selects it (its section is already open by default in Marker mode)', async ({ page }) => {
   await gotoApp(page)
   const canvas = page.locator('canvas.maplibregl-canvas')
   await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
   const [marker] = await getMarkers(page)
 
-  const markerSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Marker$/ }) })
-  expect(await markerSection.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false)
-
   const at = await pagePointFor(page, marker.lng, marker.lat)
   await page.mouse.dblclick(at.x, at.y)
 
+  const markerSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Marker$/ }) })
   await expect(markerSection).toHaveJSProperty('open', true)
   const card = markerSection.locator('input[placeholder]').first().locator('xpath=ancestor::div[2]')
   await expect(async () => {
@@ -274,19 +272,17 @@ test('double-clicking a marker opens the Marker section (collapsed by default) a
   }).toPass()
 })
 
-test('double-clicking a route waypoint opens the Route section and selects it', async ({ page }) => {
+test('double-clicking a route waypoint selects it (its section is already open by default in Route mode)', async ({ page }) => {
   await gotoApp(page)
   await page.getByRole('radio', { name: 'Route planen' }).click()
   const canvas = page.locator('canvas.maplibregl-canvas')
   await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
   const [wp] = await getRouteWaypoints(page)
 
-  const routeSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Route$/ }) })
-  expect(await routeSection.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false)
-
   const at = await pagePointFor(page, wp.lng, wp.lat)
   await page.mouse.dblclick(at.x, at.y)
 
+  const routeSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Route$/ }) })
   await expect(routeSection).toHaveJSProperty('open', true)
   const card = page.locator('[data-testid="route-waypoint-0"]')
   await expect(async () => {
@@ -342,8 +338,9 @@ test('double-clicking empty map space does not open or select anything, and stil
 
   await expect.poll(async () => page.evaluate(() => window.__mapController!.map.getZoom())).toBeGreaterThan(zoomBefore)
 
-  const markerSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Marker$/ }) })
-  expect(await markerSection.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false)
+  // Nothing was hit, so the interaction mode must stay at its default ('marker') — a hit on any
+  // kind switches the mode to match (see pointDoubleClick.ts), which a miss must not do.
+  await expect(page.getByRole('radio', { name: 'Marker setzen' })).toHaveJSProperty('ariaChecked', 'true')
 })
 
 async function focusedElementId(page: import('@playwright/test').Page): Promise<string | undefined> {

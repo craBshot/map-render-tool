@@ -24,7 +24,11 @@ const SECTION_FOR_KIND: Record<EditableKind, SidebarSectionKey> = {
  * Deliberately NOT mode-scoped like pointDrag.ts's hitTestDraggable — "let
  * me edit whatever's under my cursor" isn't the same ambiguous situation
  * as "which of several overlapping points do I want to move", so any
- * target is eligible regardless of the current interaction mode.
+ * target is eligible regardless of the current interaction mode. Since the
+ * Sidebar only renders the section for the CURRENT mode (see Sidebar.tsx),
+ * a hit on a different kind also switches the mode to match — editing a
+ * route waypoint while in Marker mode naturally puts you "into" Route
+ * mode, which is also what makes its section actually appear.
  *
  * Hit-test priority follows the map's own visual stacking (areas render
  * below the route, which renders below markers/waypoint dots — see
@@ -43,6 +47,7 @@ export function attachDoubleClickEditHandler(controller: MapController): () => v
     const pointHit = hitTestAnyKind(project, map, e.point)
     if (pointHit) {
       e.preventDefault() // suppresses MapLibre's default double-click zoom for this click
+      editor.setPointInteractionMode(pointHit.kind)
       editor.setSidebarSectionOpen(SECTION_FOR_KIND[pointHit.kind], true)
       editor.setSelectedObjectId(pointHit.id)
       editor.setFocusFieldRequest({ kind: pointHit.kind, id: pointHit.id })
@@ -53,6 +58,7 @@ export function attachDoubleClickEditHandler(controller: MapController): () => v
     if (legIndex !== null && project.route) {
       const arriving = project.route.waypoints[legIndex + 1]
       e.preventDefault()
+      editor.setPointInteractionMode('route')
       editor.setSidebarSectionOpen('route', true)
       editor.setSelectedObjectId(arriving.id)
       editor.setFocusFieldRequest({ kind: 'route', id: arriving.id, field: 'travelSec' })
@@ -62,6 +68,7 @@ export function attachDoubleClickEditHandler(controller: MapController): () => v
     const area = hitTestArea(project, e.lngLat)
     if (area) {
       e.preventDefault()
+      editor.setPointInteractionMode('area')
       editor.setSidebarSectionOpen('areas', true)
       editor.setSelectedObjectId(area.id)
       editor.setFocusFieldRequest({ kind: 'area', id: area.id })

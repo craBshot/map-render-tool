@@ -25,9 +25,11 @@
 }
 
 .active {
+  /* --mode-btn-color is set inline per-button (see InteractionModePanel.tsx) to that mode's own
+     token — falls back to --accent so nothing breaks if it's ever unset. */
   color: var(--accent-ink);
-  background: var(--accent);
-  border: 1px solid var(--accent);
+  background: var(--mode-btn-color, var(--accent));
+  border: 1px solid var(--mode-btn-color, var(--accent));
 }
 
 .button:disabled,

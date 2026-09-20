@@ -603,6 +603,7 @@ test('marker: dragging the fadeIn edge changes fadeInSec; unchecking hold-foreve
 
 test('preview runs and advances the time readout', async ({ page }) => {
   await gotoApp(page)
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
 
   await page.locator('[data-testid="camera-waypoint-0"]').getByLabel('Verweilzeit (s)').fill('0.2')
   await page.locator('[data-testid="camera-waypoint-1"]').getByLabel('Flugzeit (s)').fill('0.5')
@@ -622,6 +623,7 @@ test('preview runs and advances the time readout', async ({ page }) => {
 
 test('mp4 export produces a valid file with the correct frame count', async ({ page }) => {
   await gotoApp(page)
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
 
   const holdStart = 0.2
   const zoomDuration = 0.5 // >= the 0.5s minimum camera.ts clamps travel legs to

@@ -182,7 +182,7 @@ export function createDefaultMarker(lng: number, lat: number): MarkerObject {
     id: generateId(),
     lng,
     lat,
-    color: '#2f6bff',
+    color: '#d64545', // = index.css's --mode-marker (kept in sync manually — no CSS access from here)
     sizePx: 9,
     pulse: { enabled: true, periodSec: 1.6, scale: 3.2, strength: 0.45 },
     // startSec 5 = today's default (arrival at the last waypoint) resolved against the default camera below.
@@ -208,12 +208,15 @@ export function createDefaultCameraWaypoint(
   }
 }
 
+// = index.css's --mode-area (kept in sync manually — no CSS access from here).
+const DEFAULT_AREA_COLOR = '#2f9e5c'
+
 export function createDefaultAreaStyle(name: string, overrides: Partial<Omit<AreaStyle, 'id' | 'name'>> = {}): AreaStyle {
   return {
     id: generateId(),
     name,
-    fill: { enabled: true, color: '#2f6bff', opacity: 0.25 },
-    outline: { enabled: true, color: '#2f6bff', widthPx: 2, dashed: false },
+    fill: { enabled: true, color: DEFAULT_AREA_COLOR, opacity: 0.25 },
+    outline: { enabled: true, color: DEFAULT_AREA_COLOR, widthPx: 2, dashed: false },
     ...overrides,
   }
 }
@@ -223,8 +226,8 @@ export function createDefaultAreaStyles(): AreaStyle[] {
   return [
     createDefaultAreaStyle('Transparent gefüllt'),
     createDefaultAreaStyle('Gestrichelte Umrandung', {
-      fill: { enabled: false, color: '#2f6bff', opacity: 0.25 },
-      outline: { enabled: true, color: '#2f6bff', widthPx: 2, dashed: true },
+      fill: { enabled: false, color: DEFAULT_AREA_COLOR, opacity: 0.25 },
+      outline: { enabled: true, color: DEFAULT_AREA_COLOR, widthPx: 2, dashed: true },
     }),
   ]
 }
@@ -274,7 +277,7 @@ export function createDefaultRoute(waypoints: RouteWaypoint[]): RouteObject {
     geometry: null,
     osrmDurationSec: null,
     legDistancesM: null,
-    color: '#e6572f',
+    color: '#2f6bff', // = index.css's --mode-route (kept in sync manually — no CSS access from here)
     widthPx: 4,
     visible: true,
     appear: { startSec: 1 }, // 1 = today's default (holdStartSec) resolved against the default camera below
