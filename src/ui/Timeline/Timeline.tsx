@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { areaStateAt } from '../../map/areaAnimation'
-import { camAt, cameraTotalSec } from '../../map/camera'
+import { camAt, cameraTotalSec, MIN_TRAVEL_SEC } from '../../map/camera'
 import { markerStateAt } from '../../map/markerAnimation'
 import { routeStateAt } from '../../map/routeAnimation'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
-import { resolveAreaStyle, type AreaObject, type AreaStyle } from '../../state/types'
+import { resolveAreaStyle, type AppearTiming, type AreaObject, type AreaStyle } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
 import { strings } from '../../i18n'
 import { TimelineCameraRow } from './TimelineCameraRow'
@@ -13,6 +13,13 @@ import { TimelineObjectRow } from './TimelineObjectRow'
 import { TimelineRouteRow } from './TimelineRouteRow'
 import { TimelineRuler } from './TimelineRuler'
 import styles from './Timeline.module.css'
+
+type AppearField = 'fadeInSec' | 'holdSec' | 'fadeOutSec'
+
+/** Same Math.max(0, ...) floor MarkerPanel.tsx/AreaListPanel.tsx already apply to these three fields. */
+function patchAppear(appear: AppearTiming, field: AppearField, valueSec: number): AppearTiming {
+  return { ...appear, [field]: Math.max(0, valueSec) }
+}
 
 /** Fill color if enabled, else outline color if enabled, else a neutral gray — used for a bar's own color when unstyled. */
 function areaBarColor(style: AreaStyle | null): string {
@@ -51,6 +58,21 @@ export function Timeline() {
     }))
   }
 
+  /** field's floor matches MarkerPanel.tsx's/AreaListPanel.tsx's own number-field clamps (all Math.max(0, ...)) — same number, same floor, whichever UI writes it. */
+  function updateMarkerAppearField(id: string, field: AppearField, valueSec: number) {
+    setProject((p) => ({
+      ...p,
+      markers: p.markers.map((m) => (m.id === id ? { ...m, appear: patchAppear(m.appear, field, valueSec) } : m)),
+    }))
+  }
+
+  function updateAreaAppearField(id: string, field: AppearField, valueSec: number) {
+    setProject((p) => ({
+      ...p,
+      areas: p.areas.map((a) => (a.id === id ? { ...a, appear: patchAppear(a.appear, field, valueSec) } : a)),
+    }))
+  }
+
   function updateRouteWaypointTiming(waypointId: string, kind: 'hold' | 'travel', valueSec: number) {
     setProject((p) =>
       p.route
@@ -65,6 +87,25 @@ export function Timeline() {
           }
         : p,
     )
+  }
+
+  /** floor matches CameraPanel.tsx's own number-field clamps — Math.max(0, ...) for holdSec, Math.max(MIN_TRAVEL_SEC, ...) for travelSec. */
+  function updateCameraWaypointTiming(waypointId: string, kind: 'hold' | 'travel', valueSec: number) {
+    setProject((p) => ({
+      ...p,
+      camera: {
+        waypoints: p.camera.waypoints.map((w) =>
+          w.id === waypointId
+            ? { ...w, [kind === 'hold' ? 'holdSec' : 'travelSec']: Math.max(kind === 'travel' ? MIN_TRAVEL_SEC : 0, valueSec) }
+            : w,
+        ),
+      },
+    }))
+  }
+
+  /** floor matches RoutePanel.tsx's "Zeitpunkt (s)" field (Math.max(0, ...)). */
+  function updateRouteAppearStart(valueSec: number) {
+    setProject((p) => (p.route ? { ...p, route: { ...p.route, appear: { startSec: Math.max(0, valueSec) } } } : p))
   }
 
   useEffect(() => () => stop(), [])
@@ -158,7 +199,7 @@ export function Timeline() {
         onSeek={seek}
       />
       <div className={styles.rows}>
-        <TimelineCameraRow waypoints={project.camera.waypoints} ctx={ctx} />
+        <TimelineCameraRow waypoints={project.camera.waypoints} ctx={ctx} onResizeSegment={updateCameraWaypointTiming} />
         {project.markers.map((marker) => (
           <TimelineObjectRow
             key={marker.id}
@@ -170,6 +211,7 @@ export function Timeline() {
             selected={selectedObjectId === marker.id}
             onSelect={selectObject}
             onReposition={repositionMarker}
+            onResizeField={updateMarkerAppearField}
           />
         ))}
         {project.areas.map((area) => (
@@ -183,10 +225,16 @@ export function Timeline() {
             selected={selectedObjectId === area.id}
             onSelect={selectObject}
             onReposition={repositionArea}
+            onResizeField={updateAreaAppearField}
           />
         ))}
         {project.route && (
-          <TimelineRouteRow route={project.route} ctx={ctx} onResizeSegment={updateRouteWaypointTiming} />
+          <TimelineRouteRow
+            route={project.route}
+            ctx={ctx}
+            onResizeSegment={updateRouteWaypointTiming}
+            onResizeAppearStart={updateRouteAppearStart}
+          />
         )}
       </div>
     </div>

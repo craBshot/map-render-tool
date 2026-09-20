@@ -71,7 +71,7 @@ async function getRouteWaypoints(
 /** The camera's raw waypoint list, read straight from the persisted project state. */
 async function getCameraWaypoints(
   page: import('@playwright/test').Page,
-): Promise<{ lng: number; lat: number; zr: number }[]> {
+): Promise<{ id: string; lng: number; lat: number; zr: number; holdSec: number; travelSec: number }[]> {
   return page.evaluate(() => {
     const raw = localStorage.getItem('map-render-tool:project')
     if (!raw) return []
@@ -79,8 +79,28 @@ async function getCameraWaypoints(
   })
 }
 
+/** The route's own appear.startSec, read straight from the persisted project state. */
+async function getRouteAppearStartSec(page: import('@playwright/test').Page): Promise<number | null> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem('map-render-tool:project')
+    if (!raw) return null
+    return JSON.parse(raw).route?.appear.startSec ?? null
+  })
+}
+
+/** The route's own id, read straight from the persisted project state. */
+async function getRouteId(page: import('@playwright/test').Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem('map-render-tool:project')
+    if (!raw) return null
+    return JSON.parse(raw).route?.id ?? null
+  })
+}
+
 /** The project's raw marker list, read straight from the persisted project state. */
-async function getMarkers(page: import('@playwright/test').Page): Promise<{ id: string; appear: { startSec: number } }[]> {
+async function getMarkers(
+  page: import('@playwright/test').Page,
+): Promise<{ id: string; appear: { startSec: number; fadeInSec: number; holdSec?: number; fadeOutSec: number } }[]> {
   return page.evaluate(() => {
     const raw = localStorage.getItem('map-render-tool:project')
     if (!raw) return []
@@ -385,6 +405,164 @@ test('route: dragging a segment boundary on the Timeline changes that leg\'s tra
   await expect.poll(async () => (await getRouteWaypoints(page))[1].travelSec).not.toBe(originalTravelSec)
   const [, afterDrag] = await getRouteWaypoints(page)
   expect(afterDrag.travelSec).toBeCloseTo(originalTravelSec + 0.1 * 7, 0)
+})
+
+test('route: with default (0s) holds, a middle waypoint\'s hold handle is independently draggable (regression: must not be masked by the adjacent travel handle)', async ({
+  page,
+}) => {
+  await gotoApp(page)
+
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 150, y: 120 } }) // start (A)
+  await canvas.click({ button: 'right', position: { x: 250, y: 160 } }) // destination (becomes C)
+  await canvas.click({ button: 'right', position: { x: 200, y: 200 } }) // inserted before destination (B)
+  await expect.poll(() => getRouteWaypoints(page)).toHaveLength(3)
+
+  const [, waypointB] = await getRouteWaypoints(page)
+  const originalHoldB = waypointB.holdSec // 0 — the default that used to make this handle unreachable
+  const originalTravelB = waypointB.travelSec
+
+  const holdHandle = page.locator(`[data-testid="route-boundary-${waypointB.id}-hold"]`)
+  const travelHandle = page.locator(`[data-testid="route-boundary-${waypointB.id}-travel"]`)
+  const holdBox = await holdHandle.boundingBox()
+  const travelBox = await travelHandle.boundingBox()
+  const trackBox = await page.locator('[data-testid="timeline-route-track"]').boundingBox()
+  if (!holdBox || !travelBox || !trackBox) throw new Error('handles or track not found')
+
+  // These two mathematically coincide (holdSec_B = 0) — the declutter fix must
+  // still keep them apart, or one permanently masks the other.
+  expect(Math.abs(holdBox.x - travelBox.x)).toBeGreaterThan(2)
+
+  const y = holdBox.y + holdBox.height / 2
+  const startX = holdBox.x + holdBox.width / 2
+  await page.mouse.move(startX, y)
+  await page.mouse.down()
+  await page.mouse.move(startX + trackBox.width * 0.05, y, { steps: 4 })
+  await page.mouse.up()
+
+  await expect.poll(async () => (await getRouteWaypoints(page))[1].holdSec).not.toBe(originalHoldB)
+  const afterDrag = (await getRouteWaypoints(page))[1]
+  expect(afterDrag.holdSec).toBeCloseTo(originalHoldB + 0.05 * 7, 0)
+  expect(afterDrag.travelSec).toBeCloseTo(originalTravelB, 6) // untouched — dragging hold must not affect travel
+})
+
+test('route: dragging the leading (pre-appear) handle changes appear.startSec, not any waypoint\'s own timing', async ({ page }) => {
+  await gotoApp(page)
+
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 150, y: 120 } })
+  await canvas.click({ button: 'right', position: { x: 250, y: 160 } })
+  await expect.poll(() => getRouteWaypoints(page)).toHaveLength(2)
+
+  const originalAppearStart = await getRouteAppearStartSec(page) // default 1
+  const [start] = await getRouteWaypoints(page)
+  const originalHoldA = start.holdSec
+  const routeId = await getRouteId(page)
+
+  const handle = page.locator(`[data-testid="route-boundary-${routeId}-appear"]`)
+  const handleBox = await handle.boundingBox()
+  const trackBox = await page.locator('[data-testid="timeline-route-track"]').boundingBox()
+  if (!handleBox || !trackBox) throw new Error('appear handle or track not found')
+
+  const y = handleBox.y + handleBox.height / 2
+  const startX = handleBox.x + handleBox.width / 2
+  await page.mouse.move(startX, y)
+  await page.mouse.down()
+  await page.mouse.move(startX + trackBox.width * 0.1, y, { steps: 4 })
+  await page.mouse.up()
+
+  await expect.poll(() => getRouteAppearStartSec(page)).not.toBe(originalAppearStart)
+  const afterDrag = await getRouteAppearStartSec(page)
+  expect(afterDrag).toBeCloseTo((originalAppearStart ?? 0) + 0.1 * 7, 0)
+
+  const [startAfter] = await getRouteWaypoints(page)
+  expect(startAfter.holdSec).toBeCloseTo(originalHoldA, 6) // untouched — only appear.startSec should move
+})
+
+test('camera: dragging a segment boundary on the Timeline changes that waypoint\'s holdSec, matching CameraPanel\'s own field', async ({
+  page,
+}) => {
+  await gotoApp(page)
+
+  // Nothing has triggered a setProject() yet, so localStorage (what
+  // getCameraWaypoints reads) is still empty — the default project's first
+  // waypoint's holdSec is a known constant (createDefaultProject's explicit
+  // override), no need to round-trip through it before the first drag.
+  const originalHoldFirst = 1
+  const handle = page.locator('[data-testid^="camera-boundary-"][data-testid$="-hold"]').first()
+  const handleBox = await handle.boundingBox()
+  const trackBox = await page.locator('[data-testid="timeline-camera-track"]').boundingBox()
+  if (!handleBox || !trackBox) throw new Error('camera boundary handle or track not found')
+
+  const y = handleBox.y + handleBox.height / 2
+  const startX = handleBox.x + handleBox.width / 2
+  await page.mouse.move(startX, y)
+  await page.mouse.down()
+  await page.mouse.move(startX + trackBox.width * 0.1, y, { steps: 4 })
+  await page.mouse.up()
+
+  await expect.poll(async () => (await getCameraWaypoints(page))[0].holdSec).not.toBe(originalHoldFirst)
+  const afterDrag = (await getCameraWaypoints(page))[0]
+  expect(afterDrag.holdSec).toBeCloseTo(originalHoldFirst + 0.1 * 7, 0) // default totalSec is 7
+
+  // The sidebar field must read back the exact same number the drag just wrote — single source of truth.
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
+  const sidebarValue = await page.locator('[data-testid="camera-waypoint-0"]').getByLabel('Verweilzeit (s)').inputValue()
+  expect(Number(sidebarValue)).toBeCloseTo(afterDrag.holdSec, 6)
+})
+
+test('marker: dragging the fadeIn edge changes fadeInSec; unchecking hold-forever exposes hold/fadeOut edges too', async ({ page }) => {
+  await gotoApp(page)
+
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
+  const [marker] = await getMarkers(page)
+  const originalFadeIn = marker.appear.fadeInSec // default 0.4
+
+  const fadeInHandle = page.locator(`[data-testid="object-boundary-${marker.id}-fadeInSec"]`)
+  const trackBox = await page.locator(`[data-testid="timeline-track-${marker.id}"]`).boundingBox()
+  const fadeInBox = await fadeInHandle.boundingBox()
+  if (!fadeInBox || !trackBox) throw new Error('fadeIn handle or track not found')
+
+  const y = fadeInBox.y + fadeInBox.height / 2
+  const startX = fadeInBox.x + fadeInBox.width / 2
+  await page.mouse.move(startX, y)
+  await page.mouse.down()
+  await page.mouse.move(startX + trackBox.width * 0.05, y, { steps: 4 })
+  await page.mouse.up()
+
+  await expect.poll(async () => (await getMarkers(page))[0].appear.fadeInSec).not.toBe(originalFadeIn)
+  const afterFadeInDrag = (await getMarkers(page))[0]
+  expect(afterFadeInDrag.appear.fadeInSec).toBeCloseTo(originalFadeIn + 0.05 * 7, 0)
+  expect(afterFadeInDrag.appear.startSec).toBeCloseTo(marker.appear.startSec, 6) // untouched — dragging fadeIn must not reposition the bar
+
+  // Hold/fadeOut handles don't exist yet (hold-forever is on by default).
+  await expect(page.locator(`[data-testid="object-boundary-${marker.id}-holdSec"]`)).toHaveCount(0)
+
+  // Uncheck "hold forever" -> a finite hold + fadeOut now exist and should be draggable too.
+  await page.getByLabel('Bis zum Ende sichtbar bleiben').uncheck()
+  await expect.poll(async () => (await getMarkers(page))[0].appear.holdSec).not.toBeUndefined()
+
+  const holdHandle = page.locator(`[data-testid="object-boundary-${marker.id}-holdSec"]`)
+  await expect(holdHandle).toBeVisible()
+  const [markerWithHold] = await getMarkers(page)
+  const originalHold = markerWithHold.appear.holdSec as number
+
+  const holdBox = await holdHandle.boundingBox()
+  if (!holdBox) throw new Error('hold handle not found')
+  const holdY = holdBox.y + holdBox.height / 2
+  const holdStartX = holdBox.x + holdBox.width / 2
+  // Drag left, not right: startSec(5) + fadeInSec(0.4) + holdSec(2) = 7.4s
+  // already exceeds the default totalSec (7), so this handle's position is
+  // clamped at the track's right edge — dragging further right has no room
+  // to move (fracX is already saturated at 1). Left has room to shrink.
+  await page.mouse.move(holdStartX, holdY)
+  await page.mouse.down()
+  await page.mouse.move(holdStartX - trackBox.width * 0.05, holdY, { steps: 4 })
+  await page.mouse.up()
+
+  await expect.poll(async () => (await getMarkers(page))[0].appear.holdSec).not.toBe(originalHold)
 })
 
 test('preview runs and advances the time readout', async ({ page }) => {

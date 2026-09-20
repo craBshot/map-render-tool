@@ -83,3 +83,27 @@ export function chainSegmentsLayout(
     }
   })
 }
+
+/**
+ * Given handles' true mathematical positions (already left-to-right
+ * sorted), returns render positions nudged apart by at least minGapPct —
+ * greedy left-to-right, only ever pushes right. Leaves each item's own
+ * `leftPct` untouched (drag math still uses the segment's real boundary,
+ * captured at gesture start); only the *hit-target* render position
+ * changes. Without this, a 0-duration segment's handle exactly coincides
+ * with its neighbor's and becomes physically unreachable — a real bug,
+ * not a hypothetical: a route's default (0s) holds put every hold
+ * segment's handle exactly on top of the preceding travel segment's,
+ * leaving only the travel handles clickable.
+ */
+export function declutterHandlePositions<T extends { leftPct: number }>(
+  items: T[],
+  minGapPct: number,
+): (T & { renderLeftPct: number })[] {
+  let lastRenderPct = -Infinity
+  return items.map((item) => {
+    const renderLeftPct = Math.max(item.leftPct, lastRenderPct + minGapPct)
+    lastRenderPct = renderLeftPct
+    return { ...item, renderLeftPct }
+  })
+}

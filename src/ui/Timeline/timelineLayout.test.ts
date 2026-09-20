@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appearBarLayout, chainSegmentsLayout, pointLayout } from './timelineLayout'
+import { appearBarLayout, chainSegmentsLayout, declutterHandlePositions, pointLayout } from './timelineLayout'
 import { MIN_TRAVEL_SEC } from '../../map/camera'
 import { createDefaultCameraWaypoint, type AppearTiming, type CameraWaypoint } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
@@ -102,5 +102,42 @@ describe('chainSegmentsLayout', () => {
     expect(layout[0].startSec).toBe(4) // first hold, chain-local 0 + offset 4
     expect(layout[0].leftPct).toBeCloseTo(40, 9)
     expect(layout[1].startSec).toBe(5) // travel starts after the 1s hold
+  })
+})
+
+describe('declutterHandlePositions', () => {
+  it('leaves already-spaced items untouched', () => {
+    const items = [{ leftPct: 0 }, { leftPct: 30 }, { leftPct: 70 }]
+    const result = declutterHandlePositions(items, 2)
+    expect(result.map((r) => r.renderLeftPct)).toEqual([0, 30, 70])
+  })
+
+  it('pushes a coincident pair apart by at least minGapPct, preserving order', () => {
+    // Exactly the real bug: a 0-duration hold segment's handle lands exactly
+    // on top of the preceding travel segment's handle.
+    const items = [{ leftPct: 0 }, { leftPct: 50 }, { leftPct: 50 }]
+    const result = declutterHandlePositions(items, 2)
+    expect(result[1].renderLeftPct).toBe(50)
+    expect(result[2].renderLeftPct).toBe(52)
+    expect(result[2].renderLeftPct).toBeGreaterThan(result[1].renderLeftPct)
+  })
+
+  it('pushes a whole run of coincident/near-coincident items apart cumulatively', () => {
+    const items = [{ leftPct: 10 }, { leftPct: 10 }, { leftPct: 10 }, { leftPct: 10 }]
+    const result = declutterHandlePositions(items, 2)
+    expect(result.map((r) => r.renderLeftPct)).toEqual([10, 12, 14, 16])
+  })
+
+  it('does not mutate the true leftPct — only adds renderLeftPct', () => {
+    const items = [{ leftPct: 50 }, { leftPct: 50 }]
+    const result = declutterHandlePositions(items, 2)
+    expect(result[0].leftPct).toBe(50)
+    expect(result[1].leftPct).toBe(50)
+  })
+
+  it('an item already far enough past a nudged predecessor is not pushed further than necessary', () => {
+    const items = [{ leftPct: 0 }, { leftPct: 0 }, { leftPct: 100 }]
+    const result = declutterHandlePositions(items, 2)
+    expect(result[2].renderLeftPct).toBe(100) // far enough past item[1]'s nudged 2 — no push needed
   })
 })

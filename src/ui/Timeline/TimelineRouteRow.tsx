@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { strings } from '../../i18n'
 import type { RouteObject } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
-import { chainSegmentsLayout } from './timelineLayout'
+import { chainSegmentsLayout, declutterHandlePositions } from './timelineLayout'
 import { TimelineSegmentBoundaryHandle } from './TimelineSegmentBoundaryHandle'
 import styles from './Timeline.module.css'
 
@@ -10,7 +10,13 @@ export interface TimelineRouteRowProps {
   route: RouteObject
   ctx: TimingContext
   onResizeSegment: (waypointId: string, kind: 'hold' | 'travel', valueSec: number) => void
+  onResizeAppearStart: (valueSec: number) => void
 }
+
+/** Minimum gap between two handles' render positions, as a percent of track width — see declutterHandlePositions. */
+const MIN_HANDLE_GAP_PCT = 2
+
+type RouteHandleKind = 'appear' | 'hold' | 'travel'
 
 function stripedBackground(color: string): string {
   return `repeating-linear-gradient(45deg, ${color}, ${color} 6px, ${color}99 6px, ${color}99 12px)`
@@ -22,12 +28,39 @@ function stripedBackground(color: string): string {
  * draggable — see TimelineSegmentBoundaryHandle.tsx). Visual convention
  * (solid hold / diagonal-stripe travel) matches TimelineCameraRow, tinted
  * with the route's own color instead of the fixed camera purple.
+ *
+ * A virtual leading "appear" segment (project time 0 -> appear.startSec,
+ * rendered unfilled — the route hasn't appeared yet, so there's nothing
+ * to draw there) gets the exact same kind of edge handle as every real
+ * segment, so appear.startSec is draggable through the identical
+ * mechanism instead of a separate "move the whole bar" primitive.
  */
-export function TimelineRouteRow({ route, ctx, onResizeSegment }: TimelineRouteRowProps) {
+export function TimelineRouteRow({ route, ctx, onResizeSegment, onResizeAppearStart }: TimelineRouteRowProps) {
   const segments = chainSegmentsLayout(route.waypoints, ctx, 0, route.appear.startSec)
   const color = route.color
   const trackRef = useRef<HTMLDivElement>(null)
   const waypointById = new Map(route.waypoints.map((w) => [w.id, w]))
+
+  const appearHandleSpec = {
+    leftPct: segments[0]?.leftPct ?? 0, // = pct(appear.startSec) — the appear segment's own right edge
+    durationSec: route.appear.startSec,
+    kind: 'appear' as RouteHandleKind,
+    id: route.id,
+    currentValue: route.appear.startSec,
+  }
+  const segmentHandleSpecs = segments.map((seg) => ({
+    leftPct: seg.leftPct + seg.widthPct,
+    durationSec: seg.durationSec,
+    kind: seg.kind as RouteHandleKind,
+    id: seg.waypointId,
+    currentValue: seg.kind === 'hold' ? (waypointById.get(seg.waypointId)?.holdSec ?? 0) : (waypointById.get(seg.waypointId)?.travelSec ?? 0),
+  }))
+  const handles = declutterHandlePositions([appearHandleSpec, ...segmentHandleSpecs], MIN_HANDLE_GAP_PCT)
+
+  function handleResize(id: string, kind: RouteHandleKind, valueSec: number) {
+    if (kind === 'appear') onResizeAppearStart(valueSec)
+    else onResizeSegment(id, kind, valueSec)
+  }
 
   return (
     <div className={styles.row}>
@@ -47,29 +80,19 @@ export function TimelineRouteRow({ route, ctx, onResizeSegment }: TimelineRouteR
             }}
           />
         ))}
-        {
-          // A 0-duration segment's handle sits exactly on top of the adjacent
-          // segment's (same leftPct+widthPct) — render those last, so a
-          // non-zero (visibly-a-bar) segment's handle always wins pointer
-          // capture over a coincident zero-width one behind it.
-          [...segments]
-            .map((seg, i) => ({ seg, i }))
-            .sort((a, b) => Number(a.seg.durationSec > 0) - Number(b.seg.durationSec > 0))
-            .map(({ seg, i }) => (
-              <TimelineSegmentBoundaryHandle
-                key={i}
-                trackRef={trackRef}
-                leftPct={seg.leftPct + seg.widthPct}
-                ctx={ctx}
-                waypointId={seg.waypointId}
-                kind={seg.kind}
-                currentValue={
-                  seg.kind === 'hold' ? (waypointById.get(seg.waypointId)?.holdSec ?? 0) : (waypointById.get(seg.waypointId)?.travelSec ?? 0)
-                }
-                onResize={onResizeSegment}
-              />
-            ))
-        }
+        {handles.map((h, i) => (
+          <TimelineSegmentBoundaryHandle
+            key={i}
+            trackRef={trackRef}
+            renderLeftPct={h.renderLeftPct}
+            ctx={ctx}
+            id={h.id}
+            kind={h.kind}
+            currentValue={h.currentValue}
+            onResize={handleResize}
+            testIdPrefix="route-boundary"
+          />
+        ))}
       </div>
     </div>
   )
