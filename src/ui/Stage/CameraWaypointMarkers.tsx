@@ -22,6 +22,7 @@ export function CameraWaypointMarkers() {
   const controller = useEditorStore((s) => s.controller)
   const locked = useEditorStore((s) => s.locked)
   const playing = useEditorStore((s) => s.playing)
+  const dragPreview = useEditorStore((s) => s.dragPreview)
   const [positions, setPositions] = useState<Position[]>([])
 
   useEffect(() => {
@@ -31,7 +32,12 @@ export function CameraWaypointMarkers() {
     }
 
     const update = () => {
-      setPositions(waypoints.map((w) => controller.map.project([w.lng, w.lat])))
+      setPositions(
+        waypoints.map((w) => {
+          const live = dragPreview?.kind === 'camera' && dragPreview.id === w.id ? dragPreview : w
+          return controller.map.project([live.lng, live.lat])
+        }),
+      )
     }
     update()
     controller.map.on('move', update)
@@ -40,7 +46,7 @@ export function CameraWaypointMarkers() {
       controller.map.off('move', update)
       controller.map.off('resize', update)
     }
-  }, [controller, waypoints])
+  }, [controller, waypoints, dragPreview])
 
   if (locked || playing) return null
 
