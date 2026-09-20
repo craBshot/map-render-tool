@@ -464,17 +464,27 @@ test('project: reset clears markers/areas/route and restores the default camera,
   await canvas.click({ button: 'right', position: { x: 300, y: 300 } })
   await expect.poll(() => getCameraWaypoints(page)).toHaveLength(3)
 
+  await page.getByRole('radio', { name: 'Gebiet abfragen' }).click()
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+  await page.getByText('Testgebiet — Schutzgebiet').click()
+  await page.getByRole('button', { name: 'Ausgewählte hinzufügen' }).click()
+  await expect.poll(() => isAreaVisible(page)).toBe(true)
+
   // Dismissing the confirm dialog must leave everything untouched.
   page.once('dialog', (dialog) => dialog.dismiss())
   await page.getByRole('button', { name: 'Projekt zurücksetzen' }).click()
   await page.waitForTimeout(150)
   expect(await markerDotCount(page)).toBe(1)
   expect(await getCameraWaypoints(page)).toHaveLength(3)
+  expect(await isAreaVisible(page)).toBe(true)
 
-  // Accepting it clears markers/areas/route and restores the 2-waypoint default camera.
+  // Accepting it clears markers/areas/route and restores the 2-waypoint default camera —
+  // and must actually remove the area's map layers, not just the project state (the same
+  // stale-layer gap that was already fixed for markers in PR #6, extended here to areas).
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'Projekt zurücksetzen' }).click()
   await expect.poll(() => markerDotCount(page)).toBe(0)
   await expect.poll(() => getRouteWaypoints(page)).toEqual([])
   await expect.poll(() => getCameraWaypoints(page)).toHaveLength(2)
+  await expect.poll(() => isAreaVisible(page)).toBe(false)
 })

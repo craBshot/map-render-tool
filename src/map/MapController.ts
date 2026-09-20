@@ -145,7 +145,24 @@ export class MapController {
   }
 
   renderAreas(areas: RenderedArea[]): void {
+    this.removeStaleAreaLayers(areas)
     for (const { area, style, frame } of areas) this.renderArea(area, style, frame)
+  }
+
+  /** Removes the source+layers of any area no longer in the list (e.g. deleted, or a project reset) — same gap as removeStaleMarkerLayers. */
+  private removeStaleAreaLayers(areas: RenderedArea[]): void {
+    if (!this.styleReady) return
+    const currentIds = new Set(areas.map(({ area }) => `area-${area.id}`))
+    const style = this.map.getStyle()
+    if (!style) return
+    for (const layer of style.layers) {
+      if (!layer.id.startsWith('area-')) continue
+      const sourceId = layer.id.replace(/-(fill|line)$/, '')
+      if (sourceId !== layer.id && !currentIds.has(sourceId)) this.map.removeLayer(layer.id)
+    }
+    for (const sourceId of Object.keys(style.sources ?? {})) {
+      if (sourceId.startsWith('area-') && !currentIds.has(sourceId)) this.map.removeSource(sourceId)
+    }
   }
 
   /** Finds the first marker layer, if any, so new area layers can be inserted below it. */

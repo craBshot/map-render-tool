@@ -25,12 +25,14 @@ export function TimelineRuler({ playing, locked, playbackTimeSec, totalSec, onPl
 
   return (
     <div className={styles.ruler}>
-      <button type="button" className={styles.button} onClick={onPlay} disabled={locked}>
-        {playing ? strings.playback.stop : strings.playback.play}
-      </button>
-      <button type="button" className={styles.button} onClick={onReset} disabled={locked}>
-        {strings.playback.reset}
-      </button>
+      <div className={styles.rulerButtons}>
+        <button type="button" className={styles.button} onClick={onPlay} disabled={locked}>
+          {playing ? strings.playback.stop : strings.playback.play}
+        </button>
+        <button type="button" className={styles.button} onClick={onReset} disabled={locked}>
+          {strings.playback.reset}
+        </button>
+      </div>
       <div ref={trackRef} className={styles.rulerTrack} onPointerDown={startDrag}>
         <div className={styles.progress} style={{ width: `${progressPct}%` }} />
         <div className={styles.playhead} style={{ left: `${progressPct}%` }} />

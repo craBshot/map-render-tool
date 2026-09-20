@@ -4,11 +4,23 @@
 }
 
 .ruler {
+  position: relative;
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
-  gap: 12px;
+  /* Matches .row's 140px label column + 8px gap + 1fr track exactly, so
+     the ruler's track lines up with every row's track below it —
+     otherwise the playhead scale silently diverges from the bars'
+     scale. .time is a floated overlay (see below), not a 3rd grid
+     column, so it doesn't shrink the track relative to the rows'. */
+  grid-template-columns: 140px 1fr;
+  gap: 8px;
   align-items: center;
   padding: 12px 20px;
+}
+
+.rulerButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .button {
@@ -23,6 +35,9 @@
 }
 .button:hover {
   border-color: var(--muted);
+}
+.rulerButtons .button {
+  width: 100%;
 }
 
 .rulerTrack {
@@ -65,10 +80,14 @@
 }
 
 .time {
+  position: absolute;
+  right: 20px;
+  bottom: 2px;
   font-variant-numeric: tabular-nums;
+  font-size: 12px;
   color: var(--muted);
-  min-width: 120px;
-  text-align: right;
+  background: var(--panel);
+  padding-left: 6px;
 }
 
 .rows {
