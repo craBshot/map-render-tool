@@ -10,6 +10,7 @@ import type { ExportFormat, ResolutionPreset } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
 import { strings } from '../../i18n'
 import { fmtNum } from '../format'
+import { CollapsibleSection } from './CollapsibleSection'
 import styles from './panel.module.css'
 
 const RESOLUTION_PRESETS: { value: ResolutionPreset; width: number; height: number }[] = [
@@ -103,9 +104,7 @@ export function ExportPanel() {
   }
 
   return (
-    <details className={styles.section} open>
-      <summary className={styles.heading}>{t.heading}</summary>
-
+    <CollapsibleSection sectionKey="export" heading={t.heading}>
       <div className={styles.row}>
         <div>
           <label className={styles.label} htmlFor="exportResolution">
@@ -253,6 +252,6 @@ export function ExportPanel() {
         </button>
       </div>
       {message && <p className={isError ? styles.msgErr : styles.msg}>{message}</p>}
-    </details>
+    </CollapsibleSection>
   )
 }

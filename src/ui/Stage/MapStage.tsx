@@ -5,6 +5,7 @@ import { areaStateAt } from '../../map/areaAnimation'
 import { camAt, cameraTotalSec } from '../../map/camera'
 import { MapController } from '../../map/MapController'
 import { markerStateAt } from '../../map/markerAnimation'
+import { attachDoubleClickEditHandler } from '../../map/pointDoubleClick'
 import { attachPointDragHandler } from '../../map/pointDrag'
 import { findSnapTarget, kindForInteractionMode } from '../../map/pointHitTest'
 import { insertRouteWaypoint, waypointsToStraightLine } from '../../map/routeGeometry'
@@ -142,11 +143,13 @@ export function MapStage() {
     }
     controller.map.on('contextmenu', handleContextMenu)
     const detachPointDrag = attachPointDragHandler(controller)
+    const detachDoubleClickEdit = attachDoubleClickEditHandler(controller)
 
     return () => {
       controller.map.off('move', updateReadout)
       controller.map.off('contextmenu', handleContextMenu)
       detachPointDrag()
+      detachDoubleClickEdit()
       controller.destroy()
       controllerRef.current = null
       useEditorStore.getState().setController(null)

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useEditorStore } from '../../state/editorStore'
 import { strings } from '../../i18n'
+import { CollapsibleSection } from './CollapsibleSection'
 import styles from './panel.module.css'
 
 interface NominatimResult {
@@ -48,8 +49,7 @@ export function SearchPanel() {
   }
 
   return (
-    <details className={styles.section} open>
-      <summary className={styles.heading}>{t.heading}</summary>
+    <CollapsibleSection sectionKey="search" heading={t.heading}>
       <div className={styles.searchRow}>
         <input
           type="text"
@@ -68,6 +68,6 @@ export function SearchPanel() {
         </button>
       </div>
       {message && <p className={isError ? styles.msgErr : styles.msg}>{message}</p>}
-    </details>
+    </CollapsibleSection>
   )
 }

@@ -2,6 +2,7 @@ import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
 import type { StyleId } from '../../state/types'
 import { strings } from '../../i18n'
+import { CollapsibleSection } from './CollapsibleSection'
 import styles from './panel.module.css'
 
 const STYLE_IDS: StyleId[] = ['positron', 'liberty', 'bright', 'dark', 'fiord']
@@ -17,8 +18,7 @@ export function StylePanel() {
   }
 
   return (
-    <details className={styles.section} open>
-      <summary className={styles.heading}>{t.heading}</summary>
+    <CollapsibleSection sectionKey="style" heading={t.heading}>
       <fieldset className={styles.fieldset} disabled={locked}>
         <label className={styles.label} htmlFor="mapStyle">
           {t.mapStyle}
@@ -65,6 +65,6 @@ export function StylePanel() {
           {t.hideMinor}
         </label>
       </fieldset>
-    </details>
+    </CollapsibleSection>
   )
 }

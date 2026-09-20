@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fetchRoute } from '../../map/osrmClient'
 import { totalLineLengthMeters, waypointsToStraightLine } from '../../map/routeGeometry'
 import { useEditorStore } from '../../state/editorStore'
@@ -6,6 +6,7 @@ import { useProjectStore } from '../../state/store'
 import type { RouteObject, RoutingMode, RouteWaypoint } from '../../state/types'
 import { strings } from '../../i18n'
 import { describePoint, fmtNum, waypointLetter } from '../format'
+import { CollapsibleSection } from './CollapsibleSection'
 import styles from './panel.module.css'
 
 const ROUTING_MODES: RoutingMode[] = ['osrm', 'straight']
@@ -25,7 +26,14 @@ export function RoutePanel() {
   const route = useProjectStore((s) => s.project.route)
   const setProject = useProjectStore((s) => s.setProject)
   const locked = useEditorStore((s) => s.locked)
+  const selectedObjectId = useEditorStore((s) => s.selectedObjectId)
   const t = strings.route
+
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  useEffect(() => {
+    if (!selectedObjectId) return
+    cardRefs.current.get(selectedObjectId)?.scrollIntoView({ block: 'nearest' })
+  }, [selectedObjectId])
 
   const [calculating, setCalculating] = useState(false)
   const [error, setError] = useState('')
@@ -99,8 +107,7 @@ export function RoutePanel() {
   const totalKm = route?.geometry ? totalLineLengthMeters(route.geometry.coordinates) / 1000 : null
 
   return (
-    <details className={styles.section} open>
-      <summary className={styles.heading}>{t.heading}</summary>
+    <CollapsibleSection sectionKey="route" heading={t.heading}>
       <fieldset className={styles.fieldset} disabled={locked}>
         <p className={styles.hint}>{t.pickHint}</p>
 
@@ -108,7 +115,15 @@ export function RoutePanel() {
           <>
             <div className={styles.card}>
               {route.waypoints.map((wp, index) => (
-                <div key={wp.id}>
+                <div
+                  key={wp.id}
+                  ref={(el) => {
+                    if (el) cardRefs.current.set(wp.id, el)
+                    else cardRefs.current.delete(wp.id)
+                  }}
+                  className={selectedObjectId === wp.id ? styles.cardSelected : undefined}
+                  data-testid={`route-waypoint-${index}`}
+                >
                   <div className={styles.cardHeader}>
                     <div>
                       <span>
@@ -281,6 +296,6 @@ export function RoutePanel() {
           </>
         )}
       </fieldset>
-    </details>
+    </CollapsibleSection>
   )
 }

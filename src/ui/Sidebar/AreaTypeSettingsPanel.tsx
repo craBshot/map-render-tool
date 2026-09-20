@@ -1,6 +1,7 @@
 import type { AreaCandidateTypeSettings } from '../../state/areaCandidateTypeSettings'
 import { useSettingsStore } from '../../state/settingsStore'
 import { strings } from '../../i18n'
+import { CollapsibleSection } from './CollapsibleSection'
 import styles from './panel.module.css'
 
 const KIND_KEYS: (keyof AreaCandidateTypeSettings)[] = [
@@ -24,8 +25,7 @@ export function AreaTypeSettingsPanel() {
   const kindLabels = strings.area.kinds
 
   return (
-    <details className={styles.section} open>
-      <summary className={styles.heading}>{t.heading}</summary>
+    <CollapsibleSection sectionKey="areaTypes" heading={t.heading}>
       <p className={styles.hint}>{t.hint}</p>
       {KIND_KEYS.map((kind) => (
         <label key={kind} className={styles.check}>
@@ -37,6 +37,6 @@ export function AreaTypeSettingsPanel() {
           {kindLabels[kind]}
         </label>
       ))}
-    </details>
+    </CollapsibleSection>
   )
 }

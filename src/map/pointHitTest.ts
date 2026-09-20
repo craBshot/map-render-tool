@@ -77,6 +77,16 @@ export function hitTestDraggable(
 }
 
 /**
+ * Nearest point of ANY kind at pointerPx, regardless of the current
+ * interaction mode — used for double-click-to-edit, which is an "I want to
+ * edit whatever is under my cursor" gesture, not a "move a point" gesture,
+ * so it isn't mode-scoped the way hitTestDraggable is.
+ */
+export function hitTestAnyKind(project: ProjectFile, projector: Projector, pointerPx: { x: number; y: number }, radiusPx: number = DRAG_PICKUP_RADIUS_PX): HitPoint | null {
+  return pickNearest(projector, ALL_KINDS.flatMap((k) => collectPoints(k, project)), pointerPx, radiusPx)
+}
+
+/**
  * The cross-type snap target for a point of activeKind being placed/dragged
  * at candidateLngLat — only ever looks at the OTHER two kinds, so a point
  * can never snap to one of its own type (the design's core invariant: same-

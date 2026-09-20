@@ -5,6 +5,7 @@ import { useSettingsStore } from '../../state/settingsStore'
 import { useProjectStore } from '../../state/store'
 import { createDefaultArea, type AreaObject } from '../../state/types'
 import { strings } from '../../i18n'
+import { CollapsibleSection } from './CollapsibleSection'
 import styles from './panel.module.css'
 
 function candidateKey(c: AreaLookupCandidate): string {
@@ -34,6 +35,9 @@ export function AreaListPanel() {
 
   useEffect(() => {
     if (!pendingAreaPick) return
+    // The candidate list rendered below only makes sense to the user if this section is visible —
+    // force it open even if it was collapsed, rather than silently populating hidden content.
+    useEditorStore.getState().setSidebarSectionOpen('areas', true)
     let cancelled = false
     setLoading(true)
     setError('')
@@ -109,8 +113,7 @@ export function AreaListPanel() {
   }
 
   return (
-    <details className={styles.section} open>
-      <summary className={styles.heading}>{t.heading}</summary>
+    <CollapsibleSection sectionKey="areas" heading={t.heading}>
       <fieldset className={styles.fieldset} disabled={locked}>
         <p className={styles.hint}>{t.pickHint}</p>
 
@@ -318,6 +321,6 @@ export function AreaListPanel() {
           </div>
         ))}
       </fieldset>
-    </details>
+    </CollapsibleSection>
   )
 }

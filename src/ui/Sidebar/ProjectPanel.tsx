@@ -2,6 +2,7 @@ import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
 import { createDefaultProject } from '../../state/types'
 import { strings } from '../../i18n'
+import { CollapsibleSection } from './CollapsibleSection'
 import styles from './panel.module.css'
 
 export function ProjectPanel() {
@@ -18,8 +19,7 @@ export function ProjectPanel() {
   }
 
   return (
-    <details className={styles.section} open>
-      <summary className={styles.heading}>{t.heading}</summary>
+    <CollapsibleSection sectionKey="project" heading={t.heading}>
       <fieldset className={styles.fieldset} disabled={locked}>
         <div className={styles.btns}>
           <button type="button" className={styles.button} onClick={resetProject}>
@@ -28,6 +28,6 @@ export function ProjectPanel() {
         </div>
         <p className={styles.hint}>{t.resetHint}</p>
       </fieldset>
-    </details>
+    </CollapsibleSection>
   )
 }
