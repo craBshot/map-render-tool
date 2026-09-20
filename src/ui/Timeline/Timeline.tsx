@@ -51,6 +51,22 @@ export function Timeline() {
     }))
   }
 
+  function updateRouteWaypointTiming(waypointId: string, kind: 'hold' | 'travel', valueSec: number) {
+    setProject((p) =>
+      p.route
+        ? {
+            ...p,
+            route: {
+              ...p.route,
+              waypoints: p.route.waypoints.map((w) =>
+                w.id === waypointId ? { ...w, [kind === 'hold' ? 'holdSec' : 'travelSec']: valueSec } : w,
+              ),
+            },
+          }
+        : p,
+    )
+  }
+
   useEffect(() => () => stop(), [])
 
   function renderFrame(sec: number) {
@@ -169,7 +185,9 @@ export function Timeline() {
             onReposition={repositionArea}
           />
         ))}
-        {project.route && <TimelineRouteRow route={project.route} ctx={ctx} />}
+        {project.route && (
+          <TimelineRouteRow route={project.route} ctx={ctx} onResizeSegment={updateRouteWaypointTiming} />
+        )}
       </div>
     </div>
   )

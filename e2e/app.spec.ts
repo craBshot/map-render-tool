@@ -58,7 +58,9 @@ async function isRouteVisible(page: import('@playwright/test').Page): Promise<bo
 }
 
 /** The route's raw waypoint list, read straight from the persisted project state. */
-async function getRouteWaypoints(page: import('@playwright/test').Page): Promise<{ lng: number; lat: number }[]> {
+async function getRouteWaypoints(
+  page: import('@playwright/test').Page,
+): Promise<{ id: string; lng: number; lat: number; holdSec: number; travelSec: number }[]> {
   return page.evaluate(() => {
     const raw = localStorage.getItem('map-render-tool:project')
     if (!raw) return []
@@ -352,6 +354,37 @@ test('route: a third and fourth click insert before the destination, which stays
   expect(afterFourth[0]).toEqual(start)
   expect(afterFourth[1]).toEqual(thirdClickPoint) // earlier via-point keeps its place
   expect(afterFourth[3]).toEqual(destination) // destination is still last
+})
+
+test('route: dragging a segment boundary on the Timeline changes that leg\'s travelSec', async ({ page }) => {
+  await gotoApp(page)
+
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 150, y: 120 } }) // start
+  await canvas.click({ button: 'right', position: { x: 250, y: 160 } }) // destination
+  await expect.poll(() => getRouteWaypoints(page)).toHaveLength(2)
+
+  const [, destination] = await getRouteWaypoints(page)
+  const originalTravelSec = destination.travelSec // createDefaultRouteWaypoint's default: 3
+
+  const handle = page.locator(`[data-testid="route-boundary-${destination.id}-travel"]`)
+  const handleBox = await handle.boundingBox()
+  const trackBox = await page.locator('[data-testid="timeline-route-track"]').boundingBox()
+  if (!handleBox || !trackBox) throw new Error('route boundary handle or track not found')
+
+  // Default project totalSec is 7 (camera: 1 + 0 + 4 + 2). Drag the destination's travel-leg
+  // boundary 10% of the track width to the right -> travelSec should grow by ~0.1 * 7 = 0.7s.
+  const y = handleBox.y + handleBox.height / 2
+  const startX = handleBox.x + handleBox.width / 2
+  await page.mouse.move(startX, y)
+  await page.mouse.down()
+  await page.mouse.move(startX + trackBox.width * 0.1, y, { steps: 4 })
+  await page.mouse.up()
+
+  await expect.poll(async () => (await getRouteWaypoints(page))[1].travelSec).not.toBe(originalTravelSec)
+  const [, afterDrag] = await getRouteWaypoints(page)
+  expect(afterDrag.travelSec).toBeCloseTo(originalTravelSec + 0.1 * 7, 0)
 })
 
 test('preview runs and advances the time readout', async ({ page }) => {
