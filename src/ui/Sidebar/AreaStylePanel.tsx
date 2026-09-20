@@ -45,7 +45,13 @@ export function AreaStylePanel() {
                 value={style.name}
                 onChange={(e) => updateStyle(style.id, (s) => ({ ...s, name: e.target.value }))}
               />
-              <button type="button" className={styles.iconButton} onClick={() => deleteStyle(style.id)} title={t.deleteStyle}>
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={() => deleteStyle(style.id)}
+                disabled={areaStyles.length <= 1}
+                title={t.deleteStyle}
+              >
                 ✕
               </button>
             </div>

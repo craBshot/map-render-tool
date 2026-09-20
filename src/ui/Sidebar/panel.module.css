@@ -173,9 +173,9 @@ details:not([open]) > .heading {
 .cardSelected {
   /* A tinted background reads much more clearly than a border/box-shadow alone (too subtle at a
      glance) — .input/.select set their own opaque white background, so fields inside stay legible. */
-  background: rgba(47, 107, 255, 0.12);
+  background: rgba(47, 107, 255, 0.22);
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(47, 107, 255, 0.2);
+  box-shadow: 0 0 0 2px rgba(47, 107, 255, 0.3);
 }
 
 .cardHeader {

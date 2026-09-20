@@ -304,6 +304,20 @@ test('area pick hits the local database and never calls live Overpass', async ({
   expect(overpassRequests).toEqual([])
 })
 
+test('area style: the last remaining style cannot be deleted', async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Gebiet abfragen' }).click()
+  await openSection(page, 'Gebiets-Stile')
+
+  const styleSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Gebiets-Stile$/ }) })
+  const deleteButtons = styleSection.getByRole('button', { name: '✕' })
+  await expect(deleteButtons).toHaveCount(2) // default project seeds 2 starter styles
+
+  await deleteButtons.first().click()
+  await expect(deleteButtons).toHaveCount(1)
+  await expect(deleteButtons).toBeDisabled()
+})
+
 test('route: multiple right-clicks set waypoints, calculating via OSRM renders the line, and it survives a style change', async ({
   page,
 }) => {
