@@ -144,13 +144,20 @@ export function MapStage() {
     fitStageToCurrentResolution()
   }, [project.export.resolution.width, project.export.resolution.height])
 
+  // ResizeObserver rather than a window 'resize' listener: the stage's box
+  // also changes size when the sidebar/timeline splitters are dragged
+  // (Splitter.tsx) — a pure CSS grid-track change that never fires a
+  // window resize event, which used to leave the map stale/overlapping
+  // its neighbors until the next actual window resize.
   useEffect(() => {
-    function handleResize() {
+    const stageEl = stageRef.current
+    if (!stageEl) return
+    const observer = new ResizeObserver(() => {
       if (useEditorStore.getState().locked) return // don't fight the export loop's own pixel-ratio sizing
       fitStageToCurrentResolution()
-    }
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    })
+    observer.observe(stageEl)
+    return () => observer.disconnect()
   }, [])
 
   // Style id / label settings.

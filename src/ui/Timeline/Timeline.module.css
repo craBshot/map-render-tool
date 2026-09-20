@@ -154,14 +154,3 @@
 .cameraTravel {
   background: repeating-linear-gradient(45deg, #6b3fa0, #6b3fa0 6px, #8a5fc2 6px, #8a5fc2 12px);
 }
-
-.routeFlag {
-  position: absolute;
-  top: 0;
-  width: 0;
-  height: 0;
-  border-left: 6px solid transparent;
-  border-right: 0;
-  border-bottom: 10px solid #e6572f;
-  transform: translateX(-1px);
-}
