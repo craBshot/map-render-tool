@@ -17,10 +17,10 @@ export function Sidebar() {
     <aside className={styles.aside}>
       <h1 className={styles.title}>{strings.app.title}</h1>
       <p className={styles.lede}>{strings.app.lede}</p>
+      <InteractionModePanel />
       <SearchPanel />
       <CameraPanel />
       <StylePanel />
-      <InteractionModePanel />
       <MarkerPanel />
       <AreaListPanel />
       <AreaStylePanel />

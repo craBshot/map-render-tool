@@ -70,6 +70,13 @@ async function pagePointFor(page: import('@playwright/test').Page, lng: number, 
   return { x: box.x + proj.x, y: box.y + proj.y }
 }
 
+/** Expands a Sidebar section by its heading text — every section but "Kamerafahrt" is collapsed by default. Idempotent. */
+async function openSection(page: import('@playwright/test').Page, heading: string): Promise<void> {
+  const details = page.locator('details').filter({ has: page.locator('summary', { hasText: heading }) })
+  const isOpen = await details.evaluate((el) => (el as HTMLDetailsElement).open)
+  if (!isOpen) await details.locator('summary').click()
+}
+
 /** Left-drag between two absolute page pixels, via raw mouse events (a MapLibre canvas gesture, not HTML5 drag-and-drop). */
 async function dragBetween(page: import('@playwright/test').Page, from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
   await page.mouse.move(from.x, from.y)
@@ -213,6 +220,7 @@ test('dragging a route waypoint never calls OSRM, even in osrm routing mode', as
   await canvas.click({ button: 'right', position: { x: 350, y: 300 } })
 
   // Default routingMode is 'osrm' — "Route berechnen" fires the one expected request.
+  await openSection(page, 'Route')
   await page.getByRole('button', { name: 'Route berechnen' }).click()
   await expect.poll(() => isRouteVisible(page)).toBe(true)
   expect(osrmRequests.length).toBe(1)

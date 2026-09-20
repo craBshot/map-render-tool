@@ -108,6 +108,18 @@ async function getMarkers(
   })
 }
 
+/**
+ * Expands a Sidebar section by its heading text — every section but "Kamerafahrt" is
+ * collapsed by default, so any test that interacts with a section's own fields (not just
+ * the map/Timeline) needs to open it first. Idempotent: a no-op if already open, so it's
+ * safe to call even when a section might already be expanded (e.g. by a prior action).
+ */
+async function openSection(page: import('@playwright/test').Page, heading: string): Promise<void> {
+  const details = page.locator('details').filter({ has: page.locator('summary', { hasText: heading }) })
+  const isOpen = await details.evaluate((el) => (el as HTMLDetailsElement).open)
+  if (!isOpen) await details.locator('summary').click()
+}
+
 test('loads without console errors', async ({ page }) => {
   const errors: string[] = []
   page.on('console', (msg) => {
@@ -134,6 +146,7 @@ test('right-clicks add markers, which stay visible after a style change', async 
 
   // setStyle(diff:false) tears the map's layers down and rebuilds them —
   // the known pitfall this must survive.
+  await openSection(page, 'Aussehen')
   await page.selectOption('#mapStyle', 'dark')
   await page.waitForTimeout(300)
   await expect.poll(() => isMarkerVisible(page)).toBe(true)
@@ -149,6 +162,7 @@ test('marker: deleting one from the panel removes its map layers, not just its d
 
   // Scope to the Marker panel's own section — the camera panel also has ✕ delete
   // buttons (for waypoints), just disabled at the default 2-waypoint minimum.
+  await openSection(page, 'Marker')
   const markerSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Marker$/ }) })
   await markerSection.getByRole('button', { name: '✕' }).first().click()
   await expect.poll(() => markerDotCount(page)).toBe(1)
@@ -168,6 +182,7 @@ test('marker: naming it shows a text label layer on the map', async ({ page }) =
 
   await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
   await expect.poll(() => markerDotCount(page)).toBe(1)
+  await openSection(page, 'Marker')
 
   async function labelState(): Promise<{ visibility: string | undefined; text: unknown } | null> {
     return page.evaluate(() => {
@@ -262,6 +277,7 @@ test('area pick queries Overpass, adds the area, and it survives a style change'
 
   // setStyle(diff:false) tears the map's layers down and rebuilds them —
   // the known pitfall this must survive, same as markers.
+  await openSection(page, 'Aussehen')
   await page.selectOption('#mapStyle', 'dark')
   await page.waitForTimeout(300)
   await expect.poll(() => isAreaVisible(page)).toBe(true)
@@ -300,6 +316,7 @@ test('route: multiple right-clicks set waypoints, calculating via OSRM renders t
   await canvas.click({ button: 'right', position: { x: 250, y: 130 } })
 
   // The waypoint list renders each label as a <span>, scoped to that tag.
+  await openSection(page, 'Route')
   await expect(page.locator('span', { hasText: 'Start' })).toBeVisible()
   await expect(page.locator('span', { hasText: 'Zwischenstopp 1' })).toBeVisible()
   await expect(page.locator('span', { hasText: 'Ziel' })).toBeVisible()
@@ -309,6 +326,7 @@ test('route: multiple right-clicks set waypoints, calculating via OSRM renders t
 
   // setStyle(diff:false) tears the map's layers down and rebuilds them —
   // the known pitfall this must survive, same as markers/areas.
+  await openSection(page, 'Aussehen')
   await page.selectOption('#mapStyle', 'dark')
   await page.waitForTimeout(300)
   await expect.poll(() => isRouteVisible(page)).toBe(true)
@@ -353,6 +371,7 @@ test('route: straight-line mode renders without ever calling OSRM', async ({ pag
   await canvas.click({ button: 'right', position: { x: 150, y: 120 } })
   await canvas.click({ button: 'right', position: { x: 250, y: 130 } })
 
+  await openSection(page, 'Route')
   await page.getByRole('radio', { name: 'Luftlinie' }).click()
   await expect.poll(() => isRouteVisible(page)).toBe(true)
 
@@ -430,6 +449,7 @@ test('route: a 0s hold is still independently draggable (regression: must not be
   // Force the exact coincidence scenario: B's hold at 0s (waypoints default
   // to holdSec: 1 now, precisely so this doesn't happen by accident — but a
   // user can still explicitly set one to 0, and that must stay draggable).
+  await openSection(page, 'Route')
   const [, waypointBBefore] = await getRouteWaypoints(page)
   await page.locator(`#routeHold-${waypointBBefore.id}`).fill('0')
   await expect.poll(async () => (await getRouteWaypoints(page))[1].holdSec).toBe(0)
@@ -556,6 +576,7 @@ test('marker: dragging the fadeIn edge changes fadeInSec; unchecking hold-foreve
   await expect(page.locator(`[data-testid="object-boundary-${marker.id}-holdSec"]`)).toHaveCount(0)
 
   // Uncheck "hold forever" -> a finite hold + fadeOut now exist and should be draggable too.
+  await openSection(page, 'Marker')
   await page.getByLabel('Bis zum Ende sichtbar bleiben').uncheck()
   await expect.poll(async () => (await getMarkers(page))[0].appear.holdSec).not.toBeUndefined()
 
@@ -608,6 +629,7 @@ test('mp4 export produces a valid file with the correct frame count', async ({ p
   await page.locator('[data-testid="camera-waypoint-0"]').getByLabel('Verweilzeit (s)').fill(String(holdStart))
   await page.locator('[data-testid="camera-waypoint-1"]').getByLabel('Flugzeit (s)').fill(String(zoomDuration))
   await page.locator('[data-testid="camera-waypoint-1"]').getByLabel('Verweilzeit (s)').fill(String(holdEnd))
+  await openSection(page, 'Export')
   const fps = 24
   await page.selectOption('#exportFps', String(fps))
 
@@ -664,6 +686,7 @@ test('project: reset clears markers/areas/route and restores the default camera,
   await expect.poll(() => isAreaVisible(page)).toBe(true)
 
   // Dismissing the confirm dialog must leave everything untouched.
+  await openSection(page, 'Projekt')
   page.once('dialog', (dialog) => dialog.dismiss())
   await page.getByRole('button', { name: 'Projekt zurücksetzen' }).click()
   await page.waitForTimeout(150)

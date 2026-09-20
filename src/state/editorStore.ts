@@ -12,6 +12,22 @@ export type PointInteractionMode = 'marker' | 'area' | 'route' | 'camera'
 /** A point being placed or dragged on the map — the 3 types drag/snap operate over (areas are polygons, not points, so excluded). */
 export type DraggablePointKind = 'marker' | 'route' | 'camera'
 
+/** One entry per collapsible Sidebar section (see CollapsibleSection.tsx) — keyed by the panel it belongs to. */
+export type SidebarSectionKey = 'search' | 'camera' | 'style' | 'marker' | 'areas' | 'areaStyles' | 'route' | 'export' | 'areaTypes' | 'project'
+
+const DEFAULT_OPEN_SIDEBAR_SECTIONS: Record<SidebarSectionKey, boolean> = {
+  search: false,
+  camera: true, // the one section open by default — everything else is a specialized tool, camera is the one you always need
+  style: false,
+  marker: false,
+  areas: false,
+  areaStyles: false,
+  route: false,
+  export: false,
+  areaTypes: false,
+  project: false,
+}
+
 /**
  * Ephemeral editor/UI state that must never end up in ProjectFile — it has
  * no bearing on a rendered frame (crosshair visibility, current playback
@@ -50,6 +66,9 @@ interface EditorStore {
    */
   dragPreview: { kind: DraggablePointKind; id: string; lng: number; lat: number; snapped: boolean } | null
   setDragPreview: (preview: EditorStore['dragPreview']) => void
+  /** Which Sidebar sections are expanded — not persisted, resets to DEFAULT_OPEN_SIDEBAR_SECTIONS on reload. */
+  openSidebarSections: Record<SidebarSectionKey, boolean>
+  setSidebarSectionOpen: (key: SidebarSectionKey, open: boolean) => void
   /** Window-layout preference (not project content) — persisted separately, see layoutPersist.ts. */
   sidebarWidthPx: number
   setSidebarWidthPx: (px: number) => void
@@ -79,6 +98,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setSelectedObjectId: (id) => set({ selectedObjectId: id }),
   dragPreview: null,
   setDragPreview: (preview) => set({ dragPreview: preview }),
+  openSidebarSections: DEFAULT_OPEN_SIDEBAR_SECTIONS,
+  setSidebarSectionOpen: (key, open) => set((state) => ({ openSidebarSections: { ...state.openSidebarSections, [key]: open } })),
   sidebarWidthPx: initialLayout.sidebarWidthPx,
   setSidebarWidthPx: (px) => {
     const sidebarWidthPx = Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, px))

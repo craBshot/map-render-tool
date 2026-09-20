@@ -4,6 +4,7 @@ import { useProjectStore } from '../../state/store'
 import { createDefaultCameraWaypoint, type CameraWaypoint } from '../../state/types'
 import { strings } from '../../i18n'
 import { describePoint, waypointLetter } from '../format'
+import { CollapsibleSection } from './CollapsibleSection'
 import styles from './panel.module.css'
 
 export function CameraPanel() {
@@ -64,8 +65,7 @@ export function CameraPanel() {
   }
 
   return (
-    <details className={styles.section} open>
-      <summary className={styles.heading}>{t.heading}</summary>
+    <CollapsibleSection sectionKey="camera" heading={t.heading}>
       <fieldset className={styles.fieldset} disabled={locked}>
         <p className={styles.hint}>{t.pickHint}</p>
 
@@ -156,6 +156,6 @@ export function CameraPanel() {
           </button>
         </div>
       </fieldset>
-    </details>
+    </CollapsibleSection>
   )
 }

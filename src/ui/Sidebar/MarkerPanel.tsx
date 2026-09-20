@@ -3,6 +3,7 @@ import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
 import type { MarkerObject } from '../../state/types'
 import { strings } from '../../i18n'
+import { CollapsibleSection } from './CollapsibleSection'
 import styles from './panel.module.css'
 
 export function MarkerPanel() {
@@ -47,8 +48,7 @@ export function MarkerPanel() {
   }
 
   return (
-    <details className={styles.section} open>
-      <summary className={styles.heading}>{t.heading}</summary>
+    <CollapsibleSection sectionKey="marker" heading={t.heading}>
       <fieldset className={styles.fieldset} disabled={locked}>
         <p className={styles.hint}>{t.hint}</p>
 
@@ -305,6 +305,6 @@ export function MarkerPanel() {
           </div>
         ))}
       </fieldset>
-    </details>
+    </CollapsibleSection>
   )
 }

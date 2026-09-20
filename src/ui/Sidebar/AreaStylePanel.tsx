@@ -2,6 +2,7 @@ import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
 import { createDefaultAreaStyle, type AreaStyle } from '../../state/types'
 import { strings } from '../../i18n'
+import { CollapsibleSection } from './CollapsibleSection'
 import styles from './panel.module.css'
 
 const MAX_STYLES = 5
@@ -33,8 +34,7 @@ export function AreaStylePanel() {
   }
 
   return (
-    <details className={styles.section} open>
-      <summary className={styles.heading}>{t.heading}</summary>
+    <CollapsibleSection sectionKey="areaStyles" heading={t.heading}>
       <fieldset className={styles.fieldset} disabled={locked}>
         {areaStyles.map((style) => (
           <div key={style.id} className={styles.card}>
@@ -152,6 +152,6 @@ export function AreaStylePanel() {
           </button>
         </div>
       </fieldset>
-    </details>
+    </CollapsibleSection>
   )
 }

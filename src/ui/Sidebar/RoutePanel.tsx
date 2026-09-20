@@ -6,6 +6,7 @@ import { useProjectStore } from '../../state/store'
 import type { RouteObject, RoutingMode, RouteWaypoint } from '../../state/types'
 import { strings } from '../../i18n'
 import { describePoint, fmtNum, waypointLetter } from '../format'
+import { CollapsibleSection } from './CollapsibleSection'
 import styles from './panel.module.css'
 
 const ROUTING_MODES: RoutingMode[] = ['osrm', 'straight']
@@ -99,8 +100,7 @@ export function RoutePanel() {
   const totalKm = route?.geometry ? totalLineLengthMeters(route.geometry.coordinates) / 1000 : null
 
   return (
-    <details className={styles.section} open>
-      <summary className={styles.heading}>{t.heading}</summary>
+    <CollapsibleSection sectionKey="route" heading={t.heading}>
       <fieldset className={styles.fieldset} disabled={locked}>
         <p className={styles.hint}>{t.pickHint}</p>
 
@@ -281,6 +281,6 @@ export function RoutePanel() {
           </>
         )}
       </fieldset>
-    </details>
+    </CollapsibleSection>
   )
 }
