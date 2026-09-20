@@ -14,12 +14,14 @@ describe('appearBarLayout', () => {
     expect(layout.hasFixedEnd).toBe(true)
     expect(layout.fadeOutPct).toBe(0)
     expect(layout.leftPct + layout.fadeInPct + layout.holdPct).toBeCloseTo(100, 9)
+    expect(layout.holdSec).toBeCloseTo(9, 9) // totalSec(10) - startSec(0) - fadeInSec(1) — resolved, for labeling
   })
 
   it('holdSec defined, fadeOutSec 0: sharp cutoff, not a fixed end', () => {
     const layout = appearBarLayout(appear({ holdSec: 3, fadeOutSec: 0 }), { totalSec: 10 })
     expect(layout.hasFixedEnd).toBe(false)
     expect(layout.fadeOutPct).toBe(0)
+    expect(layout.holdSec).toBe(3)
   })
 
   it('fadeInSec 0: no fade-in sliver', () => {

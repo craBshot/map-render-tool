@@ -47,8 +47,8 @@ export function MarkerPanel() {
   }
 
   return (
-    <section className={styles.section}>
-      <h2 className={styles.heading}>{t.heading}</h2>
+    <details className={styles.section} open>
+      <summary className={styles.heading}>{t.heading}</summary>
       <fieldset className={styles.fieldset} disabled={locked}>
         <p className={styles.hint}>{t.hint}</p>
 
@@ -305,6 +305,6 @@ export function MarkerPanel() {
           </div>
         ))}
       </fieldset>
-    </section>
+    </details>
   )
 }

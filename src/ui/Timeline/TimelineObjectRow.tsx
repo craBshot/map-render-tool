@@ -1,7 +1,9 @@
 import { useCallback, useRef } from 'react'
 import type { AppearTiming } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
+import { fmtNum } from '../format'
 import { appearBarLayout, declutterHandlePositions } from './timelineLayout'
+import { lighten } from './timelineColor'
 import { TimelineSegmentBoundaryHandle } from './TimelineSegmentBoundaryHandle'
 import { useHorizontalDrag } from './useHorizontalDrag'
 import styles from './Timeline.module.css'
@@ -11,6 +13,12 @@ const CLICK_THRESHOLD_FRAC = 0.003
 
 /** Minimum gap between two handles' render positions, as a percent of track width — see declutterHandlePositions. */
 const MIN_HANDLE_GAP_PCT = 2
+
+/** Minimum gap between two labels' render positions — wider than MIN_HANDLE_GAP_PCT since label text needs room, unlike a handle's point hit target. */
+const MIN_LABEL_GAP_PCT = 6
+
+/** Floor for the bar's rendered width (percent of track) so a fully-degenerate 0/0/0 timing still renders a clickable sliver instead of vanishing. */
+const MIN_BAR_PCT = 0.5
 
 type AppearField = 'fadeInSec' | 'holdSec' | 'fadeOutSec'
 
@@ -33,6 +41,15 @@ export interface TimelineObjectRowProps {
  * stretchable via its own edge handle (hold/fadeOut only when there's a
  * finite duration to stretch — see hasFixedEnd below), same mechanism as
  * route/camera's per-segment handles.
+ *
+ * Visual convention matches route/camera: solid full-color hold, solid
+ * lighter-tint fadeIn/fadeOut (timelineColor.ts's lighten()) — a hard
+ * boundary between segments and against the empty track, not a
+ * transparency gradient (which left fadeIn/fadeOut with no visible edge).
+ * The reposition-drag/select pointer handler sits on the bar element
+ * itself (sized to the object's actual [startSec, end] span), not the
+ * full-width track — clicking the empty track outside the bar no longer
+ * drags or selects it.
  */
 export function TimelineObjectRow({ id, label, color, appear, ctx, selected, onSelect, onReposition, onResizeField }: TimelineObjectRowProps) {
   const layout = appearBarLayout(appear, ctx)
@@ -76,37 +93,56 @@ export function TimelineObjectRow({ id, label, color, appear, ctx, selected, onS
   }
   const handles = declutterHandlePositions(handleSpecs, MIN_HANDLE_GAP_PCT)
 
+  // Segment labels, one per fadeIn/hold/fadeOut with actual duration to show — hold-forever
+  // (hasFixedEnd) has no fixed fadeOutSec to display, but still shows its own (variable) resolved
+  // duration, annotated "(bis Ende)" so the user knows to go to the sidebar to change it rather
+  // than expecting a drag handle here.
+  const labelSpecs: Array<{ leftPct: number; text: string }> = []
+  if (layout.fadeInPct > 0) {
+    labelSpecs.push({ leftPct: layout.leftPct + layout.fadeInPct / 2, text: `Ein ${fmtNum(appear.fadeInSec, 1)}s` })
+  }
+  labelSpecs.push({
+    leftPct: layout.leftPct + layout.fadeInPct + layout.holdPct / 2,
+    text: `Halt ${fmtNum(layout.holdSec, 1)}s${layout.hasFixedEnd ? ' (Ende)' : ''}`,
+  })
+  if (layout.fadeOutPct > 0) {
+    labelSpecs.push({
+      leftPct: layout.leftPct + layout.fadeInPct + layout.holdPct + layout.fadeOutPct / 2,
+      text: `Aus ${fmtNum(appear.fadeOutSec, 1)}s`,
+    })
+  }
+  const labels = declutterHandlePositions(labelSpecs, MIN_LABEL_GAP_PCT)
+
+  // The bar spans only the object's own [startSec, end] range, not the full track — rendering
+  // and the drag/select hit target both use this span, not the track's full width. fadeIn/hold/
+  // fadeOut percentages below are local to the bar's own width, not the track's.
+  const rawBarPct = layout.fadeInPct + layout.holdPct + layout.fadeOutPct
+  const barPct = Math.max(rawBarPct, MIN_BAR_PCT)
+  const fadeInLocalPct = (layout.fadeInPct / barPct) * 100
+  const holdLocalPct = (layout.holdPct / barPct) * 100
+  const fadeOutLocalPct = (layout.fadeOutPct / barPct) * 100
+  const fadeColor = lighten(color, 0.35)
+
   return (
     <div className={`${styles.row} ${selected ? styles.rowSelected : ''}`} data-testid={`timeline-object-${id}`}>
       <div className={styles.rowLabel}>
         <span className={styles.swatch} style={{ background: color }} />
         <span className={styles.rowLabelText}>{label}</span>
       </div>
-      <div
-        ref={trackRef}
-        className={`${styles.rowTrack} ${styles.rowTrackDraggable}`}
-        onPointerDown={startDrag}
-        data-testid={`timeline-track-${id}`}
-      >
-        <div className={styles.bar}>
+      <div ref={trackRef} className={styles.rowTrack} data-testid={`timeline-track-${id}`}>
+        <div
+          className={`${styles.bar} ${styles.barDraggable}`}
+          style={{ left: `${layout.leftPct}%`, width: `${barPct}%` }}
+          onPointerDown={startDrag}
+        >
           {layout.fadeInPct > 0 && (
-            <div
-              className={styles.barFadeIn}
-              style={{ left: `${layout.leftPct}%`, width: `${layout.fadeInPct}%`, background: `linear-gradient(to right, transparent, ${color})` }}
-            />
+            <div className={styles.barFadeIn} style={{ left: 0, width: `${fadeInLocalPct}%`, background: fadeColor }} />
           )}
-          <div
-            className={styles.barHold}
-            style={{ left: `${layout.leftPct + layout.fadeInPct}%`, width: `${layout.holdPct}%`, background: color }}
-          />
+          <div className={styles.barHold} style={{ left: `${fadeInLocalPct}%`, width: `${holdLocalPct}%`, background: color }} />
           {layout.fadeOutPct > 0 && (
             <div
               className={styles.barFadeOut}
-              style={{
-                left: `${layout.leftPct + layout.fadeInPct + layout.holdPct}%`,
-                width: `${layout.fadeOutPct}%`,
-                background: `linear-gradient(to right, ${color}, transparent)`,
-              }}
+              style={{ left: `${fadeInLocalPct + holdLocalPct}%`, width: `${fadeOutLocalPct}%`, background: fadeColor }}
             />
           )}
         </div>
@@ -122,6 +158,11 @@ export function TimelineObjectRow({ id, label, color, appear, ctx, selected, onS
             onResize={(objId, field, valueSec) => onResizeField(objId, field, valueSec)}
             testIdPrefix="object-boundary"
           />
+        ))}
+        {labels.map((l, i) => (
+          <span key={i} className={styles.segmentLabel} style={{ left: `${l.renderLeftPct}%` }}>
+            {l.text}
+          </span>
         ))}
       </div>
     </div>

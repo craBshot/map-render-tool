@@ -103,8 +103,8 @@ export function ExportPanel() {
   }
 
   return (
-    <section className={styles.section}>
-      <h2 className={styles.heading}>{t.heading}</h2>
+    <details className={styles.section} open>
+      <summary className={styles.heading}>{t.heading}</summary>
 
       <div className={styles.row}>
         <div>
@@ -253,6 +253,6 @@ export function ExportPanel() {
         </button>
       </div>
       {message && <p className={isError ? styles.msgErr : styles.msg}>{message}</p>}
-    </section>
+    </details>
   )
 }

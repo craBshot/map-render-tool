@@ -23,6 +23,16 @@
   font-family: var(--font-head);
   font-size: 17px;
   margin: 0 0 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.heading::marker {
+  color: var(--muted);
+}
+/* Collapsed <details> still needs the bottom margin its open <summary> normally gets from .heading,
+   otherwise adjacent collapsed sections visually collide. */
+details:not([open]) > .heading {
+  margin-bottom: 0;
 }
 
 .label {
