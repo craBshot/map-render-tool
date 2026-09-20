@@ -135,20 +135,25 @@
   background: rgba(0, 0, 0, 0.04);
   border-radius: 3px;
 }
-.rowTrackDraggable {
+
+/* .bar spans only the object's own [startSec, end] range within .rowTrack (not the full track
+   width) — reposition-drag and select-click are both scoped to it, not the empty track around it. */
+.bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.barDraggable {
   cursor: grab;
   touch-action: none;
 }
-.rowTrackDraggable:active {
+.barDraggable:active {
   cursor: grabbing;
 }
 
-.bar {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
+/* fadeIn/fadeOut render as a solid lighter tint (see TimelineObjectRow.tsx's use of
+   timelineColor.ts's lighten()), same solid-hold/solid-lighter-travel convention as
+   camera/route — a hard boundary between segments, not a transparency gradient. */
 .barFadeIn,
 .barHold,
 .barFadeOut {

@@ -203,15 +203,21 @@ test('timeline: dragging a marker\'s bar changes its startSec, and a plain click
 
   const track = page.locator(`[data-testid="timeline-track-${before.id}"]`)
   const box = await track.boundingBox()
-  if (!box) throw new Error('timeline track not found')
+  // The bar (first child of the track) spans only the marker's own [startSec, end] range — the
+  // reposition-drag/select hit target is scoped to it, not the full track, so the gesture must
+  // start on it rather than anywhere on the track.
+  const bar = track.locator('div').first()
+  const barBox = await bar.boundingBox()
+  if (!box || !barBox) throw new Error('timeline track or bar not found')
 
-  // Drag right-to-left (50% -> 20% of track width) so the result stays comfortably within [0, totalSec]
-  // regardless of exactly where startSec started — a shift of -0.3*totalSec (totalSec=7 by default).
-  const y = box.y + box.height / 2
-  await page.mouse.move(box.x + box.width * 0.5, y)
+  // Drag right-to-left starting from within the bar (75% across it) so the total pointer movement
+  // is -0.3*totalSec (totalSec=7 by default) regardless of exactly where startSec started.
+  const y = barBox.y + barBox.height / 2
+  const startX = barBox.x + barBox.width * 0.75
+  await page.mouse.move(startX, y)
   await page.mouse.down()
-  await page.mouse.move(box.x + box.width * 0.35, y, { steps: 4 })
-  await page.mouse.move(box.x + box.width * 0.2, y, { steps: 4 })
+  await page.mouse.move(startX - box.width * 0.15, y, { steps: 4 })
+  await page.mouse.move(startX - box.width * 0.3, y, { steps: 4 })
   await page.mouse.up()
 
   await expect.poll(async () => (await getMarkers(page))[0].appear.startSec).not.toBe(originalStartSec)
@@ -224,7 +230,9 @@ test('timeline: dragging a marker\'s bar changes its startSec, and a plain click
   const card = markerSection.locator('input[placeholder]').first().locator('xpath=ancestor::div[2]')
   const boxShadowBefore = await card.evaluate((el) => getComputedStyle(el).boxShadow)
 
-  await track.click({ position: { x: 5, y: box.height / 2 } })
+  const barBoxAfterDrag = await bar.boundingBox()
+  if (!barBoxAfterDrag) throw new Error('bar not found after drag')
+  await bar.click({ position: { x: barBoxAfterDrag.width / 2, y: barBoxAfterDrag.height / 2 } })
   await expect(async () => {
     const boxShadowAfter = await card.evaluate((el) => getComputedStyle(el).boxShadow)
     expect(boxShadowAfter).not.toBe(boxShadowBefore)
