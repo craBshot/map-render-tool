@@ -1,7 +1,8 @@
 import { strings } from '../../i18n'
+import { MIN_TRAVEL_SEC } from '../../map/camera'
 import type { CameraWaypoint } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
-import { cameraSegmentsLayout } from './timelineLayout'
+import { chainSegmentsLayout } from './timelineLayout'
 import styles from './Timeline.module.css'
 
 export interface TimelineCameraRowProps {
@@ -9,9 +10,9 @@ export interface TimelineCameraRowProps {
   ctx: TimingContext
 }
 
-/** Camera hold/travel segments — visualized, not draggable/clickable in v1 (see plan). */
+/** Camera hold/travel segments — visualized, not draggable/clickable (user's explicit call — see plan). */
 export function TimelineCameraRow({ waypoints, ctx }: TimelineCameraRowProps) {
-  const segments = cameraSegmentsLayout(waypoints, ctx)
+  const segments = chainSegmentsLayout(waypoints, ctx, MIN_TRAVEL_SEC)
 
   return (
     <div className={styles.row}>

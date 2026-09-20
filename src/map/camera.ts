@@ -1,5 +1,6 @@
 import maplibregl from 'maplibre-gl'
 import { easeInOutCubic } from '../timeline/ease'
+import { chainSegments, chainTotalSec, type ChainSegment } from '../timeline/waypointChain'
 import type { CameraPoint, CameraState, CameraWaypoint } from '../state/types'
 
 export interface CameraFrame {
@@ -11,7 +12,7 @@ export interface CameraFrame {
 }
 
 /** Below this, a travel leg would zoom/pan too abruptly to read — same floor as the old fixed zoomDurationSec. */
-const MIN_TRAVEL_SEC = 0.5
+export const MIN_TRAVEL_SEC = 0.5
 
 /**
  * Camera position interpolated between two points at local progress t
@@ -39,17 +40,9 @@ function camSegmentAt(from: CameraPoint, to: CameraPoint, t: number): CameraFram
   return { center: [ll.lng, ll.lat], zr: z, bearing: 0, pitch: 0 }
 }
 
-function clampedHold(waypoint: CameraWaypoint): number {
-  return Math.max(0, waypoint.holdSec)
-}
-
-function clampedTravel(waypoint: CameraWaypoint): number {
-  return Math.max(MIN_TRAVEL_SEC, waypoint.travelSec)
-}
-
 /** Total duration of the whole camera flight: every waypoint's hold + travel (first waypoint's travel is 0). */
 export function cameraTotalSec(waypoints: CameraWaypoint[]): number {
-  return waypoints.reduce((sum, wp, i) => sum + clampedHold(wp) + (i === 0 ? 0 : clampedTravel(wp)), 0)
+  return chainTotalSec(waypoints, MIN_TRAVEL_SEC)
 }
 
 /** Static frame at a single point — e.g. CameraPanel's per-waypoint "show" button. */
@@ -57,12 +50,7 @@ export function camStaticAt(point: CameraPoint): CameraFrame {
   return camSegmentAt(point, point, 0)
 }
 
-export interface CameraSegment {
-  waypointId: string
-  kind: 'hold' | 'travel'
-  startSec: number
-  durationSec: number
-}
+export type CameraSegment = ChainSegment
 
 /**
  * Ordered list of the discrete hold/travel legs a flight consists of — the
@@ -70,51 +58,31 @@ export interface CameraSegment {
  * for visualization (the Timeline's camera row).
  */
 export function cameraSegments(waypoints: CameraWaypoint[]): CameraSegment[] {
-  const segments: CameraSegment[] = []
-  let elapsed = 0
-  for (let i = 0; i < waypoints.length; i++) {
-    const wp = waypoints[i]
-    if (i > 0) {
-      const durationSec = clampedTravel(wp)
-      segments.push({ waypointId: wp.id, kind: 'travel', startSec: elapsed, durationSec })
-      elapsed += durationSec
-    }
-    const durationSec = clampedHold(wp)
-    segments.push({ waypointId: wp.id, kind: 'hold', startSec: elapsed, durationSec })
-    elapsed += durationSec
-  }
-  return segments
+  return chainSegments(waypoints, MIN_TRAVEL_SEC)
 }
 
 /**
- * Camera frame at absolute project time `sec`. Walks the waypoint chain,
- * accumulating elapsed hold/travel time, until it finds the segment
- * (holding at a waypoint, or traveling to the next one) that `sec` falls
- * into, then delegates to camSegmentAt() for that segment's local
- * progress. Clamps before the first waypoint and after the last one's hold.
+ * Camera frame at absolute project time `sec`. Walks the waypoint chain
+ * (via the shared chainSegments()) until it finds the segment (holding at
+ * a waypoint, or traveling to the next one) that `sec` falls into, then
+ * delegates to camSegmentAt() for that segment's local progress. Clamps
+ * before the first waypoint and after the last one's hold.
  */
 export function camAt(camera: CameraState, sec: number): CameraFrame {
   const wps = camera.waypoints
   const clamped = Math.max(0, sec)
-  let elapsed = 0
+  const segments = chainSegments(wps, MIN_TRAVEL_SEC)
 
-  for (let i = 0; i < wps.length; i++) {
-    const wp = wps[i]
-
-    if (i > 0) {
-      const travel = clampedTravel(wp)
-      if (clamped < elapsed + travel) {
-        return camSegmentAt(wps[i - 1], wp, (clamped - elapsed) / travel)
-      }
-      elapsed += travel
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]
+    const isLastSegment = i === segments.length - 1
+    if (isLastSegment || clamped < seg.startSec + seg.durationSec) {
+      const wp = wps.find((w) => w.id === seg.waypointId)!
+      if (seg.kind === 'hold') return camStaticAt(wp)
+      const from = wps[wps.findIndex((w) => w.id === seg.waypointId) - 1]
+      const t = seg.durationSec > 0 ? (clamped - seg.startSec) / seg.durationSec : 1
+      return camSegmentAt(from, wp, t)
     }
-
-    const hold = clampedHold(wp)
-    const isLast = i === wps.length - 1
-    if (isLast || clamped < elapsed + hold) {
-      return camStaticAt(wp)
-    }
-    elapsed += hold
   }
 
   return camStaticAt(wps[wps.length - 1])

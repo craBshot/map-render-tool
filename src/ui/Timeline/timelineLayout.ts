@@ -1,6 +1,6 @@
-import { cameraSegments, type CameraSegment } from '../../map/camera'
-import type { AppearTiming, CameraWaypoint } from '../../state/types'
+import type { AppearTiming } from '../../state/types'
 import { resolveHoldSec, type TimingContext } from '../../timeline/timing'
+import { chainSegments, type ChainSegment, type ChainWaypoint } from '../../timeline/waypointChain'
 
 function pct(sec: number, totalSec: number): number {
   if (totalSec <= 0) return 0
@@ -49,14 +49,20 @@ export function pointLayout(startSec: number, ctx: TimingContext): { leftPct: nu
   return { leftPct: pct(startSec, ctx.totalSec) }
 }
 
-export interface CameraSegmentLayout extends CameraSegment {
+export interface ChainSegmentLayout extends ChainSegment {
   leftPct: number
   widthPct: number
 }
 
-/** Camera waypoint hold/travel legs as percentage-of-track layout — visualized, not draggable (v1). */
-export function cameraSegmentsLayout(waypoints: CameraWaypoint[], ctx: TimingContext): CameraSegmentLayout[] {
-  return cameraSegments(waypoints).map((seg) => ({
+/**
+ * A waypoint chain's hold/travel legs as percentage-of-track layout —
+ * shared by the camera row (visualized, not draggable) and the route row
+ * (visualized AND draggable — see TimelineSegmentBoundaryHandle.tsx).
+ * `minTravelSec` matches whatever floor the chain's own domain uses (see
+ * chainSegments()) — 0 for routes, camera.ts's MIN_TRAVEL_SEC for camera.
+ */
+export function chainSegmentsLayout(waypoints: ChainWaypoint[], ctx: TimingContext, minTravelSec = 0): ChainSegmentLayout[] {
+  return chainSegments(waypoints, minTravelSec).map((seg) => ({
     ...seg,
     leftPct: pct(seg.startSec, ctx.totalSec),
     widthPct: pct(seg.startSec + seg.durationSec, ctx.totalSec) - pct(seg.startSec, ctx.totalSec),

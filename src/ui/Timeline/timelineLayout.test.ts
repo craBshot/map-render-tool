@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { appearBarLayout, cameraSegmentsLayout, pointLayout } from './timelineLayout'
+import { appearBarLayout, chainSegmentsLayout, pointLayout } from './timelineLayout'
+import { MIN_TRAVEL_SEC } from '../../map/camera'
 import { createDefaultCameraWaypoint, type AppearTiming, type CameraWaypoint } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
 
@@ -62,7 +63,7 @@ describe('pointLayout', () => {
   })
 })
 
-describe('cameraSegmentsLayout', () => {
+describe('chainSegmentsLayout', () => {
   function wp(overrides: Partial<CameraWaypoint> = {}): CameraWaypoint {
     return { ...createDefaultCameraWaypoint(0, 0, 2), holdSec: 0, travelSec: 0, ...overrides }
   }
@@ -70,19 +71,27 @@ describe('cameraSegmentsLayout', () => {
   it('lays out a 2-waypoint chain with percentages summing to 100', () => {
     const waypoints = [wp({ holdSec: 1 }), wp({ holdSec: 2, travelSec: 4 })]
     const ctx: TimingContext = { totalSec: 7 } // 1 + 4 + 2
-    const layout = cameraSegmentsLayout(waypoints, ctx)
+    const layout = chainSegmentsLayout(waypoints, ctx, MIN_TRAVEL_SEC)
     expect(layout).toHaveLength(3)
     const totalPct = layout.reduce((sum, seg) => sum + seg.widthPct, 0)
     expect(totalPct).toBeCloseTo(100, 9)
     expect(layout[0].leftPct).toBeCloseTo(0, 9)
   })
 
-  it('delegates duration clamping to cameraSegments (sub-floor travelSec)', () => {
+  it('delegates duration clamping to the given minTravelSec floor', () => {
     const waypoints = [wp(), wp({ travelSec: 0.01 })]
     const ctx: TimingContext = { totalSec: 0.5 }
-    const layout = cameraSegmentsLayout(waypoints, ctx)
+    const layout = chainSegmentsLayout(waypoints, ctx, MIN_TRAVEL_SEC)
     const travel = layout.find((s) => s.kind === 'travel')
     expect(travel?.durationSec).toBe(0.5)
     expect(travel?.widthPct).toBeCloseTo(100, 9)
+  })
+
+  it('defaults minTravelSec to 0 (routes: a true instant leg is valid, no artificial floor)', () => {
+    const waypoints = [wp(), wp({ travelSec: 0 })]
+    const ctx: TimingContext = { totalSec: 1 }
+    const layout = chainSegmentsLayout(waypoints, ctx)
+    const travel = layout.find((s) => s.kind === 'travel')
+    expect(travel?.durationSec).toBe(0)
   })
 })
