@@ -2,7 +2,9 @@ import { useRef } from 'react'
 import { strings } from '../../i18n'
 import type { RouteObject } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
+import { fmtNum, waypointLetter } from '../format'
 import { chainSegmentsLayout, declutterHandlePositions } from './timelineLayout'
+import { lighten } from './timelineColor'
 import { TimelineSegmentBoundaryHandle } from './TimelineSegmentBoundaryHandle'
 import styles from './Timeline.module.css'
 
@@ -18,16 +20,13 @@ const MIN_HANDLE_GAP_PCT = 2
 
 type RouteHandleKind = 'appear' | 'hold' | 'travel'
 
-function stripedBackground(color: string): string {
-  return `repeating-linear-gradient(45deg, ${color}, ${color} 6px, ${color}99 6px, ${color}99 12px)`
-}
-
 /**
  * Route draws as a waypoint chain, same hold/travel model as the camera —
  * each leg independently visible on the Timeline (and, unlike the camera,
  * draggable — see TimelineSegmentBoundaryHandle.tsx). Visual convention
- * (solid hold / diagonal-stripe travel) matches TimelineCameraRow, tinted
- * with the route's own color instead of the fixed camera purple.
+ * (solid hold / solid lighter-tint travel — plain tones, no stripe
+ * pattern) matches TimelineCameraRow, tinted with the route's own color
+ * instead of the fixed camera purple.
  *
  * A virtual leading "appear" segment (project time 0 -> appear.startSec,
  * rendered unfilled — the route hasn't appeared yet, so there's nothing
@@ -40,6 +39,7 @@ export function TimelineRouteRow({ route, ctx, onResizeSegment, onResizeAppearSt
   const color = route.color
   const trackRef = useRef<HTMLDivElement>(null)
   const waypointById = new Map(route.waypoints.map((w) => [w.id, w]))
+  const waypointIndexById = new Map(route.waypoints.map((w, i) => [w.id, i]))
 
   const appearHandleSpec = {
     leftPct: segments[0]?.leftPct ?? 0, // = pct(appear.startSec) — the appear segment's own right edge
@@ -56,6 +56,15 @@ export function TimelineRouteRow({ route, ctx, onResizeSegment, onResizeAppearSt
     currentValue: seg.kind === 'hold' ? (waypointById.get(seg.waypointId)?.holdSec ?? 0) : (waypointById.get(seg.waypointId)?.travelSec ?? 0),
   }))
   const handles = declutterHandlePositions([appearHandleSpec, ...segmentHandleSpecs], MIN_HANDLE_GAP_PCT)
+
+  const labelSpecs = segments.map((seg) => ({
+    leftPct: seg.leftPct + seg.widthPct / 2,
+    text:
+      seg.kind === 'hold'
+        ? `${waypointLetter(waypointIndexById.get(seg.waypointId) ?? 0)} · ${fmtNum(seg.durationSec, 1)}s`
+        : `${fmtNum(seg.durationSec, 1)}s`,
+  }))
+  const labels = declutterHandlePositions(labelSpecs, MIN_HANDLE_GAP_PCT)
 
   function handleResize(id: string, kind: RouteHandleKind, valueSec: number) {
     if (kind === 'appear') onResizeAppearStart(valueSec)
@@ -76,7 +85,7 @@ export function TimelineRouteRow({ route, ctx, onResizeSegment, onResizeAppearSt
             style={{
               left: `${seg.leftPct}%`,
               width: `${seg.widthPct}%`,
-              background: seg.kind === 'hold' ? color : stripedBackground(color),
+              background: seg.kind === 'hold' ? color : lighten(color, 0.35),
             }}
           />
         ))}
@@ -92,6 +101,11 @@ export function TimelineRouteRow({ route, ctx, onResizeSegment, onResizeAppearSt
             onResize={handleResize}
             testIdPrefix="route-boundary"
           />
+        ))}
+        {labels.map((l, i) => (
+          <span key={i} className={styles.segmentLabel} style={{ left: `${l.renderLeftPct}%` }}>
+            {l.text}
+          </span>
         ))}
       </div>
     </div>
