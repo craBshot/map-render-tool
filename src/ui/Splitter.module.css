@@ -1,0 +1,21 @@
+.splitterX {
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+  touch-action: none;
+}
+.splitterX:hover,
+.splitterX:active {
+  background: var(--accent);
+}
+
+.splitterY {
+  height: 6px;
+  cursor: row-resize;
+  background: transparent;
+  touch-action: none;
+}
+.splitterY:hover,
+.splitterY:active {
+  background: var(--accent);
+}

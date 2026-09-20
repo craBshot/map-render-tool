@@ -9,7 +9,6 @@ import { describePoint, fmtNum, waypointLetter } from '../format'
 import styles from './panel.module.css'
 
 const ROUTING_MODES: RoutingMode[] = ['osrm', 'straight']
-const REVEAL_MODES: RouteObject['reveal'][] = ['instant', 'progressive']
 
 function formatHoursMinutes(totalSec: number): string {
   const totalMin = Math.round(totalSec / 60)
@@ -42,7 +41,7 @@ export function RoutePanel() {
       const waypoints = r.waypoints.slice()
       ;[waypoints[index], waypoints[target]] = [waypoints[target], waypoints[index]]
       const geometry = r.routingMode === 'straight' ? recomputeStraightGeometry(waypoints) : r.geometry
-      return { ...r, waypoints, geometry }
+      return { ...r, waypoints, geometry, legDistancesM: null }
     })
   }
 
@@ -50,16 +49,20 @@ export function RoutePanel() {
     updateRoute((r) => {
       const waypoints = r.waypoints.filter((_, i) => i !== index)
       const geometry = r.routingMode === 'straight' ? recomputeStraightGeometry(waypoints) : r.geometry
-      return { ...r, waypoints, geometry }
+      return { ...r, waypoints, geometry, legDistancesM: null }
     })
+  }
+
+  function updateWaypointTiming(index: number, fn: (wp: RouteWaypoint) => RouteWaypoint) {
+    updateRoute((r) => ({ ...r, waypoints: r.waypoints.map((w, i) => (i === index ? fn(w) : w)) }))
   }
 
   function setRoutingMode(mode: RoutingMode) {
     setError('')
     updateRoute((r) =>
       mode === 'straight'
-        ? { ...r, routingMode: mode, geometry: recomputeStraightGeometry(r.waypoints), osrmDurationSec: null }
-        : { ...r, routingMode: mode, geometry: null, osrmDurationSec: null },
+        ? { ...r, routingMode: mode, geometry: recomputeStraightGeometry(r.waypoints), osrmDurationSec: null, legDistancesM: null }
+        : { ...r, routingMode: mode, geometry: null, osrmDurationSec: null, legDistancesM: null },
     )
   }
 
@@ -69,7 +72,12 @@ export function RoutePanel() {
     setError('')
     try {
       const result = await fetchRoute(route.waypoints)
-      updateRoute((r) => ({ ...r, geometry: result.geometry, osrmDurationSec: result.durationSec }))
+      updateRoute((r) => ({
+        ...r,
+        geometry: result.geometry,
+        osrmDurationSec: result.durationSec,
+        legDistancesM: result.legDistancesM,
+      }))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -100,40 +108,79 @@ export function RoutePanel() {
           <>
             <div className={styles.card}>
               {route.waypoints.map((wp, index) => (
-                <div key={index} className={styles.cardHeader}>
-                  <div>
-                    <span>
-                      {waypointLetter(index)} — {waypointLabel(index, route.waypoints.length)}
-                    </span>
-                    <div className={styles.coords}>{describePoint(wp.lng, wp.lat)}</div>
+                <div key={wp.id}>
+                  <div className={styles.cardHeader}>
+                    <div>
+                      <span>
+                        {waypointLetter(index)} — {waypointLabel(index, route.waypoints.length)}
+                      </span>
+                      <div className={styles.coords}>{describePoint(wp.lng, wp.lat)}</div>
+                    </div>
+                    <div className={styles.btns}>
+                      <button
+                        type="button"
+                        className={styles.iconButton}
+                        onClick={() => moveWaypoint(index, -1)}
+                        disabled={index === 0}
+                        title={t.moveUp}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.iconButton}
+                        onClick={() => moveWaypoint(index, 1)}
+                        disabled={index === route.waypoints.length - 1}
+                        title={t.moveDown}
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.iconButton}
+                        onClick={() => deleteWaypoint(index)}
+                        title={t.deleteWaypoint}
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
-                  <div className={styles.btns}>
-                    <button
-                      type="button"
-                      className={styles.iconButton}
-                      onClick={() => moveWaypoint(index, -1)}
-                      disabled={index === 0}
-                      title={t.moveUp}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.iconButton}
-                      onClick={() => moveWaypoint(index, 1)}
-                      disabled={index === route.waypoints.length - 1}
-                      title={t.moveDown}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.iconButton}
-                      onClick={() => deleteWaypoint(index)}
-                      title={t.deleteWaypoint}
-                    >
-                      ✕
-                    </button>
+
+                  <div className={styles.row}>
+                    {index > 0 && (
+                      <div>
+                        <label className={styles.label} htmlFor={`routeTravel-${wp.id}`}>
+                          {t.travelSec}
+                        </label>
+                        <input
+                          id={`routeTravel-${wp.id}`}
+                          type="number"
+                          className={styles.input}
+                          min={0}
+                          step={0.5}
+                          value={wp.travelSec}
+                          onChange={(e) =>
+                            updateWaypointTiming(index, (w) => ({ ...w, travelSec: Math.max(0, Number(e.target.value)) }))
+                          }
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label className={styles.label} htmlFor={`routeHold-${wp.id}`}>
+                        {t.holdSec}
+                      </label>
+                      <input
+                        id={`routeHold-${wp.id}`}
+                        type="number"
+                        className={styles.input}
+                        min={0}
+                        step={0.5}
+                        value={wp.holdSec}
+                        onChange={(e) =>
+                          updateWaypointTiming(index, (w) => ({ ...w, holdSec: Math.max(0, Number(e.target.value)) }))
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -211,34 +258,6 @@ export function RoutePanel() {
                 />
               </div>
             </div>
-
-            <label className={styles.label}>{t.reveal}</label>
-            <div className={styles.row}>
-              {REVEAL_MODES.map((mode) => (
-                <label key={mode} className={styles.check}>
-                  <input
-                    type="radio"
-                    name="route-reveal"
-                    checked={route.reveal === mode}
-                    onChange={() => updateRoute((r) => ({ ...r, reveal: mode }))}
-                  />
-                  {t.revealModes[mode]}
-                </label>
-              ))}
-            </div>
-            {route.reveal === 'progressive' && (
-              <div>
-                <label className={styles.label}>{t.drawDuration}</label>
-                <input
-                  type="number"
-                  className={styles.input}
-                  min={0}
-                  step={0.1}
-                  value={route.drawDurationSec}
-                  onChange={(e) => updateRoute((r) => ({ ...r, drawDurationSec: Math.max(0, Number(e.target.value)) }))}
-                />
-              </div>
-            )}
 
             <div>
               <label className={styles.label}>{t.appearAt}</label>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { camAt, cameraTotalSec } from './camera'
+import { camAt, cameraSegments, cameraTotalSec } from './camera'
 import { createDefaultCameraWaypoint, type CameraState, type CameraWaypoint } from '../state/types'
 
 function wp(overrides: Partial<CameraWaypoint> = {}): CameraWaypoint {
@@ -106,5 +106,46 @@ describe('camAt — waypoint chain (holds + multiple legs)', () => {
     const midway = camAt(snap, 0.25) // half of the clamped 0.5s floor, not half of the requested 0.01s
     expect(midway.center[0]).toBeGreaterThan(0)
     expect(midway.center[0]).toBeLessThan(10)
+  })
+})
+
+describe('cameraSegments', () => {
+  it('lists a 2-waypoint chain as hold,travel,hold, in order', () => {
+    const camera = twoPointCamera({ start: { holdSec: 1 }, end: { holdSec: 2, travelSec: 4 } })
+    const segments = cameraSegments(camera.waypoints)
+    expect(segments.map((s) => s.kind)).toEqual(['hold', 'travel', 'hold'])
+    expect(segments[0]).toMatchObject({ startSec: 0, durationSec: 1 })
+    expect(segments[1]).toMatchObject({ startSec: 1, durationSec: 4 })
+    expect(segments[2]).toMatchObject({ startSec: 5, durationSec: 2 })
+  })
+
+  it('lists a 4-waypoint chain as 7 segments, alternating kind', () => {
+    const wps = [
+      wp({ id: 'w0', holdSec: 1 }),
+      wp({ id: 'w1', holdSec: 1, travelSec: 2 }),
+      wp({ id: 'w2', holdSec: 1, travelSec: 2 }),
+      wp({ id: 'w3', holdSec: 1, travelSec: 2 }),
+    ]
+    const segments = cameraSegments(wps)
+    expect(segments).toHaveLength(7)
+    expect(segments.map((s) => s.kind)).toEqual([
+      'hold', 'travel', 'hold', 'travel', 'hold', 'travel', 'hold',
+    ])
+  })
+
+  it('delegates to the same clamp cameraTotalSec uses — a sub-floor travelSec is clamped in the output', () => {
+    const wps = [wp({ id: 'w0' }), wp({ id: 'w1', travelSec: 0.01 })]
+    const segments = cameraSegments(wps)
+    const travel = segments.find((s) => s.kind === 'travel')
+    expect(travel?.durationSec).toBe(0.5) // MIN_TRAVEL_SEC floor, not the requested 0.01
+  })
+
+  it('segment durations sum to cameraTotalSec', () => {
+    const A = wp({ id: 'a', holdSec: 1 })
+    const B = wp({ id: 'b', holdSec: 2, travelSec: 3 })
+    const C = wp({ id: 'c', holdSec: 1, travelSec: 5 })
+    const waypoints = [A, B, C]
+    const sum = cameraSegments(waypoints).reduce((s, seg) => s + seg.durationSec, 0)
+    expect(sum).toBe(cameraTotalSec(waypoints))
   })
 })

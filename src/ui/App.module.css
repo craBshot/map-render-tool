@@ -1,21 +1,30 @@
 .app {
   height: 100%;
   display: grid;
-  grid-template-columns: 330px 1fr;
   overflow: hidden;
 }
 
 .main {
   display: grid;
-  grid-template-rows: 1fr auto;
   min-width: 0;
   min-height: 0;
 }
 
+.timelineWrapper {
+  min-height: 0;
+  overflow-y: auto;
+}
+
 @media (max-width: 760px) {
   .app {
-    grid-template-columns: 1fr;
-    grid-template-rows: 55vh auto;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 55vh auto !important;
     overflow: auto;
+  }
+  /* Resizing the sidebar is a desktop-workflow affordance — on the stacked mobile
+     layout the sidebar/main split isn't a left-right divide anymore, so hide it
+     rather than have it eat a 3rd row out of the fixed 2-row mobile template. */
+  .sidebarSplitter {
+    display: none;
   }
 }

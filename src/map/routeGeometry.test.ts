@@ -1,11 +1,33 @@
 import { describe, expect, it } from 'vitest'
+import type { RouteObject, RouteWaypoint } from '../state/types'
 import {
   haversineDistanceMeters,
   insertRouteWaypoint,
+  legLengthFractions,
   sliceLineByFraction,
   totalLineLengthMeters,
   waypointsToStraightLine,
 } from './routeGeometry'
+
+function wp(id: string, lng: number, lat: number, overrides: Partial<Pick<RouteWaypoint, 'holdSec' | 'travelSec'>> = {}): RouteWaypoint {
+  return { id, lng, lat, holdSec: 0, travelSec: 3, ...overrides }
+}
+
+function route(overrides: Partial<RouteObject> = {}): RouteObject {
+  return {
+    id: 'r1',
+    waypoints: [],
+    routingMode: 'osrm',
+    geometry: null,
+    osrmDurationSec: null,
+    legDistancesM: null,
+    color: '#e6572f',
+    widthPx: 4,
+    visible: true,
+    appear: { startSec: 0 },
+    ...overrides,
+  }
+}
 
 describe('haversineDistanceMeters', () => {
   it('matches the well-known ~111.2 km per degree of latitude', () => {
@@ -73,10 +95,7 @@ describe('sliceLineByFraction', () => {
 
 describe('waypointsToStraightLine', () => {
   it('connects waypoints in order as [lng, lat] pairs', () => {
-    const line = waypointsToStraightLine([
-      { lng: 13.4, lat: 52.5 },
-      { lng: 11.6, lat: 48.1 },
-    ])
+    const line = waypointsToStraightLine([wp('a', 13.4, 52.5), wp('b', 11.6, 48.1)])
     expect(line).toEqual({
       type: 'LineString',
       coordinates: [
@@ -88,10 +107,10 @@ describe('waypointsToStraightLine', () => {
 })
 
 describe('insertRouteWaypoint', () => {
-  const a = { lng: 0, lat: 0 }
-  const b = { lng: 1, lat: 1 }
-  const c = { lng: 2, lat: 2 }
-  const d = { lng: 3, lat: 3 }
+  const a = wp('a', 0, 0)
+  const b = wp('b', 1, 1)
+  const c = wp('c', 2, 2)
+  const d = wp('d', 3, 3)
 
   it('appends the first click as the start (0 -> 1)', () => {
     expect(insertRouteWaypoint([], a)).toEqual([a])
@@ -107,5 +126,52 @@ describe('insertRouteWaypoint', () => {
 
   it('inserts a fourth click before the destination too, after the first via-point (3 -> 4)', () => {
     expect(insertRouteWaypoint([a, c, b], d)).toEqual([a, c, d, b])
+  })
+})
+
+describe('legLengthFractions', () => {
+  it('returns an empty array for 0 or 1 waypoints', () => {
+    expect(legLengthFractions(route({ waypoints: [] }))).toEqual([])
+    expect(legLengthFractions(route({ waypoints: [wp('a', 0, 0)] }))).toEqual([])
+  })
+
+  it('uses legDistancesM (proportionally, not evenly) when present and length-matching', () => {
+    const r = route({
+      waypoints: [wp('a', 0, 0), wp('b', 1, 1), wp('c', 2, 2)],
+      legDistancesM: [3000, 1000],
+    })
+    const fractions = legLengthFractions(r)
+    expect(fractions[0]).toBeCloseTo(0.75, 9)
+    expect(fractions[1]).toBeCloseTo(0.25, 9)
+  })
+
+  it('falls back to straight-line (haversine) distances when legDistancesM is missing', () => {
+    // Two equal-length meridian segments -> equal fractions, verified against haversineDistanceMeters directly.
+    const r = route({ waypoints: [wp('a', 0, 0), wp('b', 0, 1), wp('c', 0, 2)], legDistancesM: null })
+    const fractions = legLengthFractions(r)
+    expect(fractions[0]).toBeCloseTo(0.5, 9)
+    expect(fractions[1]).toBeCloseTo(0.5, 9)
+  })
+
+  it('falls back to straight-line distances when legDistancesM is stale (length mismatch after a waypoint edit)', () => {
+    const r = route({
+      waypoints: [wp('a', 0, 0), wp('b', 0, 1), wp('c', 0, 2)],
+      legDistancesM: [12345], // stale: only 1 entry for a 2-leg route
+    })
+    const fractions = legLengthFractions(r)
+    expect(fractions).toHaveLength(2)
+    expect(fractions[0]).toBeCloseTo(0.5, 9)
+    expect(fractions[1]).toBeCloseTo(0.5, 9)
+  })
+
+  it('splits evenly when total length is 0 (degenerate: all waypoints coincide)', () => {
+    const r = route({ waypoints: [wp('a', 5, 5), wp('b', 5, 5), wp('c', 5, 5)], legDistancesM: null })
+    expect(legLengthFractions(r)).toEqual([0.5, 0.5])
+  })
+
+  it('fractions always sum to 1', () => {
+    const r = route({ waypoints: [wp('a', 0, 0), wp('b', 1, 0.3), wp('c', 2, -1), wp('d', 2.5, 0.8)], legDistancesM: null })
+    const fractions = legLengthFractions(r)
+    expect(fractions.reduce((sum, f) => sum + f, 0)).toBeCloseTo(1, 9)
   })
 })

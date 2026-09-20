@@ -17,6 +17,10 @@ export const de = {
     stop: 'Vorschau stoppen',
     reset: 'Zum Start',
   },
+  timeline: {
+    cameraRow: 'Kamerafahrt',
+    routeRow: 'Route',
+  },
   camera: {
     heading: 'Kamerafahrt',
     pickHint: 'Rechtsklick im Kamera-Modus fügt einen Wegpunkt hinzu.',
@@ -84,6 +88,11 @@ export const de = {
     moveUp: 'Nach oben',
     moveDown: 'Nach unten',
     delete: 'Löschen',
+    appearAt: 'Erscheint bei (s)',
+    fadeDuration: 'Einblenden (s)',
+    holdForever: 'Bis zum Ende sichtbar bleiben',
+    holdDuration: 'Verweildauer (s)',
+    fadeOut: 'Ausblenden (s)',
     kinds: {
       administrative: 'Verwaltungsgebiet',
       protected_area: 'Schutzgebiet',
@@ -110,11 +119,6 @@ export const de = {
     outlineColor: 'Linienfarbe',
     outlineWidth: 'Linienbreite (px)',
     outlineDashed: 'Gestrichelt',
-    appearAt: 'Erscheint bei (s)',
-    fadeDuration: 'Einblenden (s)',
-    holdForever: 'Bis zum Ende sichtbar bleiben',
-    holdDuration: 'Verweildauer (s)',
-    fadeOut: 'Ausblenden (s)',
   },
   areaTypeSettings: {
     heading: 'Gebietstypen',
@@ -141,12 +145,8 @@ export const de = {
     visible: 'Sichtbar',
     color: 'Farbe',
     width: 'Linienbreite (px)',
-    reveal: 'Zeichnen',
-    revealModes: {
-      instant: 'Komplett einblenden',
-      progressive: 'Zeichnen',
-    },
-    drawDuration: 'Zeichendauer (s)',
+    holdSec: 'Verweilzeit (s)',
+    travelSec: 'Flugzeit (s)',
     appearAt: 'Zeitpunkt (s)',
     deleteRoute: 'Route löschen',
   },
@@ -187,5 +187,11 @@ export const de = {
     failedPrefix: 'Export fehlgeschlagen: ',
     doneMp4: (seconds: string, mb: string) => `Fertig: ${seconds} s Video, ${mb} MB. Direkt in DaVinci importieren.`,
     doneImages: (count: number, mb: string) => `Fertig: ${count} Bilder, ${mb} MB. In DaVinci den entpackten Ordner als Bildsequenz importieren.`,
+  },
+  project: {
+    heading: 'Projekt',
+    reset: 'Projekt zurücksetzen',
+    resetHint: 'Entfernt alle Marker, Gebiete und die Route, setzt die Kamerafahrt auf den Standard zurück.',
+    resetConfirm: 'Wirklich alles zurücksetzen? Marker, Gebiete, Route und Kamerafahrt gehen unwiderruflich verloren.',
   },
 }

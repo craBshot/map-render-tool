@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
 import type { MarkerObject } from '../../state/types'
@@ -8,7 +9,14 @@ export function MarkerPanel() {
   const markers = useProjectStore((s) => s.project.markers)
   const setProject = useProjectStore((s) => s.setProject)
   const locked = useEditorStore((s) => s.locked)
+  const selectedObjectId = useEditorStore((s) => s.selectedObjectId)
   const t = strings.marker
+
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  useEffect(() => {
+    if (!selectedObjectId) return
+    cardRefs.current.get(selectedObjectId)?.scrollIntoView({ block: 'nearest' })
+  }, [selectedObjectId])
 
   function updateMarker(id: string, fn: (m: MarkerObject) => MarkerObject) {
     setProject((p) => ({ ...p, markers: p.markers.map((m) => (m.id === id ? fn(m) : m)) }))
@@ -45,7 +53,14 @@ export function MarkerPanel() {
         <p className={styles.hint}>{t.hint}</p>
 
         {markers.map((marker) => (
-          <div key={marker.id} className={styles.card}>
+          <div
+            key={marker.id}
+            ref={(el) => {
+              if (el) cardRefs.current.set(marker.id, el)
+              else cardRefs.current.delete(marker.id)
+            }}
+            className={`${styles.card} ${selectedObjectId === marker.id ? styles.cardSelected : ''}`}
+          >
             <div className={styles.cardHeader}>
               <input
                 type="text"

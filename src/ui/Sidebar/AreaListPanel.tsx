@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { findAreaCandidatesWithFallback, resolveAreaGeometry, type AreaLookupCandidate } from '../../map/areaLookup'
 import { useEditorStore } from '../../state/editorStore'
 import { useSettingsStore } from '../../state/settingsStore'
@@ -17,12 +17,19 @@ export function AreaListPanel() {
   const setProject = useProjectStore((s) => s.setProject)
   const locked = useEditorStore((s) => s.locked)
   const pendingAreaPick = useEditorStore((s) => s.pendingAreaPick)
+  const selectedObjectId = useEditorStore((s) => s.selectedObjectId)
   const enabledTypes = useSettingsStore((s) => s.areaCandidateTypes)
   const t = strings.area
 
   const [candidates, setCandidates] = useState<AreaLookupCandidate[] | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
+
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  useEffect(() => {
+    if (!selectedObjectId) return
+    cardRefs.current.get(selectedObjectId)?.scrollIntoView({ block: 'nearest' })
+  }, [selectedObjectId])
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -136,7 +143,14 @@ export function AreaListPanel() {
         )}
 
         {areas.map((area, index) => (
-          <div key={area.id} className={styles.card}>
+          <div
+            key={area.id}
+            ref={(el) => {
+              if (el) cardRefs.current.set(area.id, el)
+              else cardRefs.current.delete(area.id)
+            }}
+            className={`${styles.card} ${selectedObjectId === area.id ? styles.cardSelected : ''}`}
+          >
             <div className={styles.cardHeader}>
               <input
                 type="text"
@@ -202,6 +216,104 @@ export function AreaListPanel() {
                   {style.name}
                 </label>
               ))}
+            </div>
+
+            <div className={styles.row}>
+              <div>
+                <label className={styles.label} htmlFor={`areaStart-${area.id}`}>
+                  {t.appearAt}
+                </label>
+                <input
+                  id={`areaStart-${area.id}`}
+                  type="number"
+                  className={styles.input}
+                  min={0}
+                  step={0.1}
+                  value={area.appear.startSec}
+                  onChange={(e) =>
+                    updateArea(area.id, (a) => ({
+                      ...a,
+                      appear: { ...a.appear, startSec: Math.max(0, Number(e.target.value)) },
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className={styles.label} htmlFor={`areaFadeIn-${area.id}`}>
+                  {t.fadeDuration}
+                </label>
+                <input
+                  id={`areaFadeIn-${area.id}`}
+                  type="number"
+                  className={styles.input}
+                  min={0}
+                  step={0.1}
+                  value={area.appear.fadeInSec}
+                  onChange={(e) =>
+                    updateArea(area.id, (a) => ({
+                      ...a,
+                      appear: { ...a.appear, fadeInSec: Math.max(0, Number(e.target.value)) },
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={area.appear.holdSec === undefined}
+                onChange={(e) =>
+                  updateArea(area.id, (a) => ({
+                    ...a,
+                    appear: { ...a.appear, holdSec: e.target.checked ? undefined : 2 },
+                  }))
+                }
+              />
+              {t.holdForever}
+            </label>
+
+            <div className={styles.row}>
+              {area.appear.holdSec !== undefined && (
+                <div>
+                  <label className={styles.label} htmlFor={`areaHold-${area.id}`}>
+                    {t.holdDuration}
+                  </label>
+                  <input
+                    id={`areaHold-${area.id}`}
+                    type="number"
+                    className={styles.input}
+                    min={0}
+                    step={0.1}
+                    value={area.appear.holdSec}
+                    onChange={(e) =>
+                      updateArea(area.id, (a) => ({
+                        ...a,
+                        appear: { ...a.appear, holdSec: Math.max(0, Number(e.target.value)) },
+                      }))
+                    }
+                  />
+                </div>
+              )}
+              <div>
+                <label className={styles.label} htmlFor={`areaFadeOut-${area.id}`}>
+                  {t.fadeOut}
+                </label>
+                <input
+                  id={`areaFadeOut-${area.id}`}
+                  type="number"
+                  className={styles.input}
+                  min={0}
+                  step={0.1}
+                  value={area.appear.fadeOutSec}
+                  onChange={(e) =>
+                    updateArea(area.id, (a) => ({
+                      ...a,
+                      appear: { ...a.appear, fadeOutSec: Math.max(0, Number(e.target.value)) },
+                    }))
+                  }
+                />
+              </div>
             </div>
           </div>
         ))}

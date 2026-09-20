@@ -6,6 +6,7 @@ import { CameraPanel } from './CameraPanel'
 import { ExportPanel } from './ExportPanel'
 import { InteractionModePanel } from './InteractionModePanel'
 import { MarkerPanel } from './MarkerPanel'
+import { ProjectPanel } from './ProjectPanel'
 import { RoutePanel } from './RoutePanel'
 import { SearchPanel } from './SearchPanel'
 import { StylePanel } from './StylePanel'
@@ -26,6 +27,7 @@ export function Sidebar() {
       <RoutePanel />
       <ExportPanel />
       <AreaTypeSettingsPanel />
+      <ProjectPanel />
     </aside>
   )
 }

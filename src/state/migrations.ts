@@ -1,4 +1,4 @@
-import { createDefaultAreaStyles, generateId, PROJECT_VERSION, type ProjectFile } from './types'
+import { generateId, PROJECT_VERSION, type ProjectFile } from './types'
 
 type Migration = (data: unknown) => unknown
 
@@ -9,12 +9,32 @@ type Migration = (data: unknown) => unknown
  * changes so old project files keep loading.
  */
 const migrations: Record<number, Migration> = {
-  // v1 -> v2: added areas/areaStyles (region highlighting).
+  // v1 -> v2: added areas/areaStyles (region highlighting). Seeds the two
+  // default styles in their AT-THE-TIME (v2-v5) shape, appear included —
+  // deliberately NOT createDefaultAreaStyles() from types.ts, which now
+  // returns the CURRENT (v6+) shape with no appear on the style at all.
+  // Reusing that live factory here would seed a shape the later v4->v5
+  // step (which still reads style.appear) can't process.
   1: (data) => ({
     ...(data as object),
     version: 2,
     areas: [],
-    areaStyles: createDefaultAreaStyles(),
+    areaStyles: [
+      {
+        id: generateId(),
+        name: 'Transparent gefüllt',
+        fill: { enabled: true, color: '#2f6bff', opacity: 0.25 },
+        outline: { enabled: true, color: '#2f6bff', widthPx: 2, dashed: false },
+        appear: { mode: 'start', fadeDurationSec: 0.6 },
+      },
+      {
+        id: generateId(),
+        name: 'Gestrichelte Umrandung',
+        fill: { enabled: false, color: '#2f6bff', opacity: 0.25 },
+        outline: { enabled: true, color: '#2f6bff', widthPx: 2, dashed: true },
+        appear: { mode: 'start', fadeDurationSec: 0.6 },
+      },
+    ],
   }),
   // v2 -> v3: added route (single route, drawn progressively).
   2: (data) => ({
@@ -87,6 +107,67 @@ const migrations: Record<number, Migration> = {
     const route = d.route ? { ...d.route, appear: { startSec: oldAppearTimeSec(d.route.appear) } } : null
 
     return { ...(data as object), version: 5, camera: { waypoints }, markers, areaStyles, route }
+  },
+  // v5 -> v6: area appear/hold/fade timing moved from the shared AreaStyle
+  // onto each AreaObject individually — multiple areas sharing one style
+  // used to share one timeline row/one set of timing, which reads wrong
+  // for a per-object timeline. Resolves each area's style's OLD appear
+  // onto the area, losslessly, before AreaStyle.appear is discarded.
+  5: (data) => {
+    const DEFAULT_APPEAR = { startSec: 0, fadeInSec: 0.6, holdSec: undefined, fadeOutSec: 0 }
+    const d = data as {
+      areas: Array<Record<string, unknown> & { styleId: string | null }>
+      areaStyles: Array<Record<string, unknown> & { id: string; appear: unknown }>
+    }
+    const styleById = new Map(d.areaStyles.map((s) => [s.id, s]))
+
+    const areas = d.areas.map((a) => {
+      const style = a.styleId !== null ? styleById.get(a.styleId) : undefined
+      return { ...a, appear: style ? style.appear : DEFAULT_APPEAR }
+    })
+    const areaStyles = d.areaStyles.map((s) => {
+      const rest = { ...s }
+      delete rest.appear
+      return rest
+    })
+
+    return { ...(data as object), version: 6, areas, areaStyles }
+  },
+  // v6 -> v7: route waypoints gained per-leg hold/travel timing (id,
+  // holdSec, travelSec), replacing the single combined reveal/
+  // drawDurationSec pair — routes now draw as a waypoint chain, same model
+  // as the camera, so a specific waypoint's arrival time is knowable (needed
+  // to sync the route draw with the camera flight). travelSec is split
+  // evenly across legs from the old drawDurationSec (a reasonable default,
+  // not proportional to leg length — the OSRM leg distances needed for that
+  // aren't in the old saved shape; users can retune via the new per-leg UI).
+  // reveal === 'instant' maps exactly (every leg's travelSec: 0).
+  6: (data) => {
+    const d = data as {
+      route:
+        | (Record<string, unknown> & {
+            waypoints: Array<{ lng: number; lat: number }>
+            reveal: 'instant' | 'progressive'
+            drawDurationSec: number
+          })
+        | null
+    }
+    let route: Record<string, unknown> | null = null
+    if (d.route) {
+      const legCount = Math.max(1, d.route.waypoints.length - 1)
+      const perLegTravelSec = d.route.reveal === 'instant' ? 0 : d.route.drawDurationSec / legCount
+      const waypoints = d.route.waypoints.map((w, i) => ({
+        id: generateId(),
+        lng: w.lng,
+        lat: w.lat,
+        holdSec: 0,
+        travelSec: i === 0 ? 0 : perLegTravelSec,
+      }))
+      route = { ...d.route, waypoints, legDistancesM: null }
+      delete route.reveal
+      delete route.drawDurationSec
+    }
+    return { ...(data as object), version: 7, route }
   },
 }
 

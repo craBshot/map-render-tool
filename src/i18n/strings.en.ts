@@ -22,6 +22,10 @@ export const en: typeof de = {
     stop: 'Stop preview',
     reset: 'Back to start',
   },
+  timeline: {
+    cameraRow: 'Camera flight',
+    routeRow: 'Route',
+  },
   camera: {
     heading: 'Camera flight',
     pickHint: 'Right-click the map in camera mode to add a waypoint.',
@@ -89,6 +93,11 @@ export const en: typeof de = {
     moveUp: 'Move up',
     moveDown: 'Move down',
     delete: 'Delete',
+    appearAt: 'Appears at (s)',
+    fadeDuration: 'Fade in (s)',
+    holdForever: 'Stay visible until the end',
+    holdDuration: 'Hold duration (s)',
+    fadeOut: 'Fade out (s)',
     kinds: {
       administrative: 'Administrative area',
       protected_area: 'Protected area',
@@ -115,11 +124,6 @@ export const en: typeof de = {
     outlineColor: 'Line color',
     outlineWidth: 'Line width (px)',
     outlineDashed: 'Dashed',
-    appearAt: 'Appears at (s)',
-    fadeDuration: 'Fade in (s)',
-    holdForever: 'Stay visible until the end',
-    holdDuration: 'Hold duration (s)',
-    fadeOut: 'Fade out (s)',
   },
   areaTypeSettings: {
     heading: 'Area types',
@@ -146,12 +150,8 @@ export const en: typeof de = {
     visible: 'Visible',
     color: 'Color',
     width: 'Line width (px)',
-    reveal: 'Drawing',
-    revealModes: {
-      instant: 'Show fully',
-      progressive: 'Draw progressively',
-    },
-    drawDuration: 'Draw duration (s)',
+    holdSec: 'Hold (s)',
+    travelSec: 'Travel time (s)',
     appearAt: 'Time (s)',
     deleteRoute: 'Delete route',
   },
@@ -192,5 +192,11 @@ export const en: typeof de = {
     failedPrefix: 'Export failed: ',
     doneMp4: (seconds: string, mb: string) => `Done: ${seconds}s video, ${mb} MB. Import directly into DaVinci.`,
     doneImages: (count: number, mb: string) => `Done: ${count} images, ${mb} MB. Import the unzipped folder into DaVinci as an image sequence.`,
+  },
+  project: {
+    heading: 'Project',
+    reset: 'Reset project',
+    resetHint: 'Removes all markers, areas and the route, resets the camera flight to its default.',
+    resetConfirm: 'Really reset everything? Markers, areas, route and camera flight will be lost permanently.',
   },
 }

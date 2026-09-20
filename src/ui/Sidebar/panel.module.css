@@ -160,6 +160,10 @@
   margin: 0 0 10px;
   background: #fff;
 }
+.cardSelected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(47, 107, 255, 0.2);
+}
 
 .cardHeader {
   display: flex;

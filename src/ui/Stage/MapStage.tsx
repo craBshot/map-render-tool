@@ -9,7 +9,13 @@ import { insertRouteWaypoint, waypointsToStraightLine } from '../../map/routeGeo
 import { routeStateAt } from '../../map/routeAnimation'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
-import { createDefaultCameraWaypoint, createDefaultMarker, createDefaultRoute, resolveAreaStyle } from '../../state/types'
+import {
+  createDefaultCameraWaypoint,
+  createDefaultMarker,
+  createDefaultRoute,
+  createDefaultRouteWaypoint,
+  resolveAreaStyle,
+} from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
 import { CameraWaypointMarkers } from './CameraWaypointMarkers'
 import { Crosshair } from './Crosshair'
@@ -66,7 +72,7 @@ export function MapStage() {
           current.areas.map((area) => ({
             area,
             style: resolveAreaStyle(area.styleId, current.areaStyles),
-            frame: areaStateAt(resolveAreaStyle(area.styleId, current.areaStyles), timingCtx, null),
+            frame: areaStateAt(area, timingCtx, null),
           })),
         )
         controller.renderRoute(current.route ? { route: current.route, frame: routeStateAt(current.route, null) } : null)
@@ -101,8 +107,8 @@ export function MapStage() {
 
       if (useEditorStore.getState().pointInteractionMode === 'route') {
         useProjectStore.getState().setProject((p) => {
-          const waypoints = insertRouteWaypoint(p.route?.waypoints ?? [], { lng, lat })
-          const route = p.route ? { ...p.route, waypoints } : createDefaultRoute(waypoints)
+          const waypoints = insertRouteWaypoint(p.route?.waypoints ?? [], createDefaultRouteWaypoint(lng, lat))
+          const route = p.route ? { ...p.route, waypoints, legDistancesM: null } : createDefaultRoute(waypoints)
           return {
             ...p,
             route: route.routingMode === 'straight' ? { ...route, geometry: waypointsToStraightLine(waypoints) } : route,
@@ -144,13 +150,20 @@ export function MapStage() {
     fitStageToCurrentResolution()
   }, [project.export.resolution.width, project.export.resolution.height])
 
+  // ResizeObserver rather than a window 'resize' listener: the stage's box
+  // also changes size when the sidebar/timeline splitters are dragged
+  // (Splitter.tsx) — a pure CSS grid-track change that never fires a
+  // window resize event, which used to leave the map stale/overlapping
+  // its neighbors until the next actual window resize.
   useEffect(() => {
-    function handleResize() {
+    const stageEl = stageRef.current
+    if (!stageEl) return
+    const observer = new ResizeObserver(() => {
       if (useEditorStore.getState().locked) return // don't fight the export loop's own pixel-ratio sizing
       fitStageToCurrentResolution()
-    }
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    })
+    observer.observe(stageEl)
+    return () => observer.disconnect()
   }, [])
 
   // Style id / label settings.
@@ -184,7 +197,7 @@ export function MapStage() {
       project.areas.map((area) => ({
         area,
         style: resolveAreaStyle(area.styleId, project.areaStyles),
-        frame: areaStateAt(resolveAreaStyle(area.styleId, project.areaStyles), timingCtx, null),
+        frame: areaStateAt(area, timingCtx, null),
       })),
     )
     controller.reorderAreaLayers(project.areas.map((a) => a.id))

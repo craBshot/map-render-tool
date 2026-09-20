@@ -1,4 +1,4 @@
-export const PROJECT_VERSION = 5
+export const PROJECT_VERSION = 7
 
 /**
  * crypto.randomUUID() requires a secure context, but this app must also
@@ -88,11 +88,6 @@ export interface AreaStyle {
   name: string
   fill: { enabled: boolean; color: string; opacity: number }
   outline: { enabled: boolean; color: string; widthPx: number; dashed: boolean }
-  appear: AppearTiming & {
-    // Reserved for a future pulse effect (MapLibre has no built-in polygon
-    // pulse primitive like the marker's circle halo) — not implemented yet.
-    pulse?: { enabled: boolean; periodSec: number; strength: number }
-  }
 }
 
 export interface AreaObject {
@@ -105,6 +100,11 @@ export interface AreaObject {
   /** Provenance only — never re-fetched from this. */
   source: { osmType: 'way' | 'relation'; osmId: number }
   visible: boolean
+  appear: AppearTiming & {
+    // Reserved for a future pulse effect (MapLibre has no built-in polygon
+    // pulse primitive like the marker's circle halo) — not implemented yet.
+    pulse?: { enabled: boolean; periodSec: number; strength: number }
+  }
 }
 
 export function resolveAreaStyle(styleId: string | null, styles: AreaStyle[]): AreaStyle | null {
@@ -113,11 +113,15 @@ export function resolveAreaStyle(styleId: string | null, styles: AreaStyle[]): A
 }
 
 export type RoutingMode = 'osrm' | 'straight'
-export type RouteReveal = 'instant' | 'progressive'
 
 export interface RouteWaypoint {
+  id: string
   lng: number
   lat: number
+  /** Pause here (in the draw progression) before continuing. No visual effect on the last waypoint — the route is already fully drawn by then. */
+  holdSec: number
+  /** Time to draw the leg arriving at this waypoint from the previous one. Unused (always 0) on the first waypoint. */
+  travelSec: number
 }
 
 export interface RouteObject {
@@ -129,14 +133,20 @@ export interface RouteObject {
   geometry: GeoJSON.LineString | null
   /** OSRM's own travel-time estimate — informational only, always null for routingMode === 'straight'. */
   osrmDurationSec: number | null
+  /**
+   * Per-leg road distance in meters from OSRM's legs[], parallel to
+   * waypoints[1..] (leg i arrives at waypoints[i]). null for
+   * routingMode === 'straight' (computed on the fly instead), before a
+   * successful "Route berechnen", or after ANY waypoint list mutation
+   * (add/move/delete) — a stale array could silently apply the wrong
+   * leg's distance after a reorder even when its length still happens to
+   * match, so every mutation site must explicitly null this out.
+   */
+  legDistancesM: number[] | null
   color: string
   widthPx: number
   visible: boolean
   appear: { startSec: number }
-  /** 'instant' = shows fully at appear time. 'progressive' = draws in over drawDurationSec. */
-  reveal: RouteReveal
-  /** Only relevant when reveal === 'progressive'. Fixed draw duration in seconds. */
-  drawDurationSec: number
 }
 
 export interface ExportSettings {
@@ -204,7 +214,6 @@ export function createDefaultAreaStyle(name: string, overrides: Partial<Omit<Are
     name,
     fill: { enabled: true, color: '#2f6bff', opacity: 0.25 },
     outline: { enabled: true, color: '#2f6bff', widthPx: 2, dashed: false },
-    appear: { startSec: 0, fadeInSec: 0.6, holdSec: undefined, fadeOutSec: 0 },
     ...overrides,
   }
 }
@@ -233,6 +242,27 @@ export function createDefaultArea(
     geometry,
     source,
     visible: true,
+    appear: { startSec: 0, fadeInSec: 0.6, holdSec: undefined, fadeOutSec: 0 },
+  }
+}
+
+export function createDefaultRouteWaypoint(
+  lng: number,
+  lat: number,
+  overrides: Partial<Pick<RouteWaypoint, 'holdSec' | 'travelSec'>> = {},
+): RouteWaypoint {
+  return {
+    id: generateId(),
+    lng,
+    lat,
+    // Non-zero (matches CameraPanel's own default) so a freshly-created
+    // waypoint's hold segment has real, visible, grabbable width on the
+    // Timeline immediately — a 0-duration segment's handle is reachable
+    // (see declutterHandlePositions) but easy to miss without deliberately
+    // hunting for it.
+    holdSec: 1,
+    travelSec: 3, // matches today's default drawDurationSec
+    ...overrides,
   }
 }
 
@@ -243,12 +273,11 @@ export function createDefaultRoute(waypoints: RouteWaypoint[]): RouteObject {
     routingMode: 'osrm',
     geometry: null,
     osrmDurationSec: null,
+    legDistancesM: null,
     color: '#e6572f',
     widthPx: 4,
     visible: true,
     appear: { startSec: 1 }, // 1 = today's default (holdStartSec) resolved against the default camera below
-    reveal: 'progressive',
-    drawDurationSec: 3,
   }
 }
 

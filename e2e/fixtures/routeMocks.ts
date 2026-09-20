@@ -86,6 +86,7 @@ const MOCK_OSRM_RESPONSE = {
         ],
       },
       duration: 1234.5,
+      legs: [{ distance: 25000 }, { distance: 25000 }],
     },
   ],
 }
