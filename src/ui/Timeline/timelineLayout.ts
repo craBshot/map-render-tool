@@ -12,6 +12,8 @@ export interface AppearBarLayout {
   fadeInPct: number
   holdPct: number
   fadeOutPct: number
+  /** The hold segment's resolved duration in seconds (see resolveHoldSec) — for labeling, since holdPct alone can't be turned back into seconds. */
+  holdSec: number
   /**
    * True when holdSec is undefined ("stay visible until the end") — the
    * bar is drawn flush to 100% with no fade-out sliver, since fadeOutStart
@@ -40,6 +42,7 @@ export function appearBarLayout(appear: AppearTiming, ctx: TimingContext): Appea
     fadeInPct: fadeInEndPct - leftPct,
     holdPct: holdEndPct - fadeInEndPct,
     fadeOutPct: fadeOutEndPct - holdEndPct,
+    holdSec: hold,
     hasFixedEnd,
   }
 }
