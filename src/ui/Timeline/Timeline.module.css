@@ -154,3 +154,14 @@
 .cameraTravel {
   background: repeating-linear-gradient(45deg, #6b3fa0, #6b3fa0 6px, #8a5fc2 6px, #8a5fc2 12px);
 }
+
+/* Route segments: same solid-hold / striped-travel convention as camera, tinted per-route via inline style (color is user-configurable). */
+.routeHold,
+.routeTravel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.routeHold {
+  border-radius: 2px;
+}

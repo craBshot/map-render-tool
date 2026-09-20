@@ -6,11 +6,13 @@ export interface OsrmRouteResult {
   geometry: GeoJSON.LineString
   /** OSRM's own travel-time estimate, informational only. */
   durationSec: number
+  /** Per-leg road distance in meters, one entry per leg (waypoints.length - 1), in waypoint order. */
+  legDistancesM: number[]
 }
 
 interface OsrmResponse {
   code: string
-  routes?: Array<{ geometry: GeoJSON.LineString; duration: number }>
+  routes?: Array<{ geometry: GeoJSON.LineString; duration: number; legs: Array<{ distance: number }> }>
 }
 
 /**
@@ -36,5 +38,5 @@ export async function fetchRoute(waypoints: RouteWaypoint[]): Promise<OsrmRouteR
   const [route] = data.routes ?? []
   if (!route) throw new Error('OSRM hat keine Route geliefert.')
 
-  return { geometry: route.geometry, durationSec: route.duration }
+  return { geometry: route.geometry, durationSec: route.duration, legDistancesM: route.legs.map((l) => l.distance) }
 }

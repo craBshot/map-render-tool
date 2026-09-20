@@ -133,6 +133,42 @@ const migrations: Record<number, Migration> = {
 
     return { ...(data as object), version: 6, areas, areaStyles }
   },
+  // v6 -> v7: route waypoints gained per-leg hold/travel timing (id,
+  // holdSec, travelSec), replacing the single combined reveal/
+  // drawDurationSec pair — routes now draw as a waypoint chain, same model
+  // as the camera, so a specific waypoint's arrival time is knowable (needed
+  // to sync the route draw with the camera flight). travelSec is split
+  // evenly across legs from the old drawDurationSec (a reasonable default,
+  // not proportional to leg length — the OSRM leg distances needed for that
+  // aren't in the old saved shape; users can retune via the new per-leg UI).
+  // reveal === 'instant' maps exactly (every leg's travelSec: 0).
+  6: (data) => {
+    const d = data as {
+      route:
+        | (Record<string, unknown> & {
+            waypoints: Array<{ lng: number; lat: number }>
+            reveal: 'instant' | 'progressive'
+            drawDurationSec: number
+          })
+        | null
+    }
+    let route: Record<string, unknown> | null = null
+    if (d.route) {
+      const legCount = Math.max(1, d.route.waypoints.length - 1)
+      const perLegTravelSec = d.route.reveal === 'instant' ? 0 : d.route.drawDurationSec / legCount
+      const waypoints = d.route.waypoints.map((w, i) => ({
+        id: generateId(),
+        lng: w.lng,
+        lat: w.lat,
+        holdSec: 0,
+        travelSec: i === 0 ? 0 : perLegTravelSec,
+      }))
+      route = { ...d.route, waypoints, legDistancesM: null }
+      delete route.reveal
+      delete route.drawDurationSec
+    }
+    return { ...(data as object), version: 7, route }
+  },
 }
 
 export class UnsupportedProjectVersionError extends Error {

@@ -94,4 +94,13 @@ describe('chainSegmentsLayout', () => {
     const travel = layout.find((s) => s.kind === 'travel')
     expect(travel?.durationSec).toBe(0)
   })
+
+  it('offsetSec shifts every segment in project time (routes: appear.startSec)', () => {
+    const waypoints = [wp({ holdSec: 1 }), wp({ holdSec: 1, travelSec: 2 })]
+    const ctx: TimingContext = { totalSec: 10 }
+    const layout = chainSegmentsLayout(waypoints, ctx, 0, 4)
+    expect(layout[0].startSec).toBe(4) // first hold, chain-local 0 + offset 4
+    expect(layout[0].leftPct).toBeCloseTo(40, 9)
+    expect(layout[1].startSec).toBe(5) // travel starts after the 1s hold
+  })
 })

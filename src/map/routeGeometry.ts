@@ -1,4 +1,4 @@
-import type { RouteWaypoint } from '../state/types'
+import type { RouteObject, RouteWaypoint } from '../state/types'
 
 /**
  * Pure geometry helpers for routes — hand-rolled, no dependency (same
@@ -60,6 +60,32 @@ export function sliceLineByFraction(coordinates: GeoJSON.Position[], fraction: n
   }
 
   return coordinates
+}
+
+/**
+ * One entry per leg (waypoints.length - 1), each the leg's fraction of the
+ * route's total length — used to map a waypoint chain's per-leg travel
+ * timing onto the drawn geometry's length-based fraction (see
+ * routeAnimation.ts). Uses route.legDistancesM (real road distance from
+ * OSRM) when present and length-matching the current waypoints; otherwise
+ * falls back to straight-line (haversine) distance between consecutive
+ * waypoints — either because routingMode is 'straight', or because
+ * legDistancesM is missing/stale (e.g. after a waypoint was added/moved/
+ * removed since the last "Route berechnen"). Both branches fall back to an
+ * even split if the total length is 0 (degenerate: all waypoints coincide).
+ */
+export function legLengthFractions(route: RouteObject): number[] {
+  const legCount = Math.max(0, route.waypoints.length - 1)
+  if (legCount === 0) return []
+
+  const distances =
+    route.legDistancesM && route.legDistancesM.length === legCount
+      ? route.legDistancesM
+      : route.waypoints.slice(1).map((w, i) => haversineDistanceMeters([route.waypoints[i].lng, route.waypoints[i].lat], [w.lng, w.lat]))
+
+  const total = distances.reduce((sum, d) => sum + d, 0)
+  if (total <= 0) return distances.map(() => 1 / legCount)
+  return distances.map((d) => d / total)
 }
 
 /** Connects waypoints directly in order — the "Luftlinie" routing mode, no request. */

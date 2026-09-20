@@ -98,7 +98,7 @@ describe('migrate', () => {
 
     const migrated = migrate(v1)
 
-    expect(migrated.version).toBe(6)
+    expect(migrated.version).toBe(7)
     expect(migrated.areas).toEqual([])
     expect(migrated.areaStyles).toHaveLength(2)
     expect(migrated.route).toBeNull()
@@ -110,7 +110,7 @@ describe('migrate', () => {
 
     const migrated = migrate(v2)
 
-    expect(migrated.version).toBe(6)
+    expect(migrated.version).toBe(7)
     expect(migrated.route).toBeNull()
   })
 
@@ -136,18 +136,22 @@ describe('migrate', () => {
 
     const migrated = migrate(v3)
 
-    expect(migrated.version).toBe(6)
+    expect(migrated.version).toBe(7)
     expect(migrated.route).not.toHaveProperty('profile')
     expect(migrated.route).not.toHaveProperty('drawSpeedKmh')
-    expect(migrated.route?.drawDurationSec).toBe(3)
-    expect(migrated.route?.waypoints).toEqual([{ lng: 0, lat: 0 }])
+    expect(migrated.route).not.toHaveProperty('reveal')
+    expect(migrated.route).not.toHaveProperty('drawDurationSec')
+    expect(migrated.route?.legDistancesM).toBeNull()
+    expect(migrated.route?.waypoints).toHaveLength(1)
+    expect(migrated.route?.waypoints[0]).toMatchObject({ lng: 0, lat: 0, holdSec: 0, travelSec: 0 })
+    expect(typeof migrated.route?.waypoints[0].id).toBe('string')
     expect(migrated.route?.appear).toEqual({ startSec: 1 }) // zoomStart resolved against holdStartSec=1
   })
 
   it('migrates a v3 project with no route (route: null) to the current version', () => {
     const v3 = { ...oldV4Project(), version: 3, route: null }
     const migrated = migrate(v3)
-    expect(migrated.version).toBe(6)
+    expect(migrated.version).toBe(7)
     expect(migrated.route).toBeNull()
   })
 
@@ -213,8 +217,92 @@ describe('migrate', () => {
       expect(migrated.areaStyles[0]).not.toHaveProperty('appear')
     })
 
-    it('bumps the version to 6', () => {
-      expect(migrate(oldV4Project()).version).toBe(6)
+    it('bumps the version to the current version', () => {
+      expect(migrate(oldV4Project()).version).toBe(7)
+    })
+  })
+
+  describe('v6 -> v7: route waypoints gain per-leg hold/travel timing', () => {
+    function v6WithRoute(route: Record<string, unknown> | null): Record<string, unknown> {
+      return { ...oldV4Project(), version: 6, route }
+    }
+
+    it('splits an old progressive route\'s drawDurationSec evenly across legs, first waypoint travelSec 0', () => {
+      const migrated = migrate(
+        v6WithRoute({
+          id: 'r1',
+          waypoints: [{ lng: 0, lat: 0 }, { lng: 1, lat: 1 }, { lng: 2, lat: 2 }],
+          routingMode: 'osrm',
+          geometry: null,
+          osrmDurationSec: null,
+          color: '#e6572f',
+          widthPx: 4,
+          visible: true,
+          appear: { startSec: 1 },
+          reveal: 'progressive',
+          drawDurationSec: 6,
+        }),
+      )
+
+      expect(migrated.version).toBe(7)
+      expect(migrated.route?.waypoints).toHaveLength(3)
+      expect(migrated.route?.waypoints[0]).toMatchObject({ lng: 0, lat: 0, holdSec: 0, travelSec: 0 })
+      expect(migrated.route?.waypoints[1]).toMatchObject({ lng: 1, lat: 1, holdSec: 0, travelSec: 3 })
+      expect(migrated.route?.waypoints[2]).toMatchObject({ lng: 2, lat: 2, holdSec: 0, travelSec: 3 })
+      const ids = migrated.route?.waypoints.map((w) => w.id) ?? []
+      expect(new Set(ids).size).toBe(3)
+    })
+
+    it("gives every leg travelSec 0 for an old instant-reveal route (exact behavioral match)", () => {
+      const migrated = migrate(
+        v6WithRoute({
+          id: 'r1',
+          waypoints: [{ lng: 0, lat: 0 }, { lng: 1, lat: 1 }],
+          routingMode: 'straight',
+          geometry: null,
+          osrmDurationSec: null,
+          color: '#e6572f',
+          widthPx: 4,
+          visible: true,
+          appear: { startSec: 0 },
+          reveal: 'instant',
+          drawDurationSec: 3,
+        }),
+      )
+
+      expect(migrated.route?.waypoints[1].travelSec).toBe(0)
+    })
+
+    it('sets legDistancesM to null and drops reveal/drawDurationSec', () => {
+      const migrated = migrate(
+        v6WithRoute({
+          id: 'r1',
+          waypoints: [{ lng: 0, lat: 0 }, { lng: 1, lat: 1 }],
+          routingMode: 'osrm',
+          geometry: null,
+          osrmDurationSec: null,
+          color: '#e6572f',
+          widthPx: 4,
+          visible: true,
+          appear: { startSec: 0 },
+          reveal: 'progressive',
+          drawDurationSec: 4,
+        }),
+      )
+
+      expect(migrated.route?.legDistancesM).toBeNull()
+      expect(migrated.route).not.toHaveProperty('reveal')
+      expect(migrated.route).not.toHaveProperty('drawDurationSec')
+    })
+
+    it('passes route: null through unchanged', () => {
+      const migrated = migrate(v6WithRoute(null))
+      expect(migrated.version).toBe(7)
+      expect(migrated.route).toBeNull()
+    })
+
+    it('bumps the version to 7', () => {
+      expect(migrate(v6WithRoute(null)).version).toBe(7)
     })
   })
 })

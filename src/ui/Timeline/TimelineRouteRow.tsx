@@ -1,7 +1,7 @@
 import { strings } from '../../i18n'
 import type { RouteObject } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
-import { appearBarLayout } from './timelineLayout'
+import { chainSegmentsLayout } from './timelineLayout'
 import styles from './Timeline.module.css'
 
 export interface TimelineRouteRowProps {
@@ -9,16 +9,19 @@ export interface TimelineRouteRowProps {
   ctx: TimingContext
 }
 
+function stripedBackground(color: string): string {
+  return `repeating-linear-gradient(45deg, ${color}, ${color} 6px, ${color}99 6px, ${color}99 12px)`
+}
+
 /**
- * Route's draw timing as a bar — reuses appearBarLayout by mapping the
- * route's own fields onto an AppearTiming shape: fadeIn = the progressive
- * draw duration (0 for 'instant' reveal, i.e. drawn immediately), hold =
- * always "until the end" (nothing ever un-draws a route), fadeOut = none
- * (routes don't disappear). Not draggable in v1 (same as the camera row).
+ * Route draws as a waypoint chain, same hold/travel model as the camera —
+ * each leg independently visible on the Timeline (and, unlike the camera,
+ * draggable — see TimelineSegmentBoundaryHandle.tsx). Visual convention
+ * (solid hold / diagonal-stripe travel) matches TimelineCameraRow, tinted
+ * with the route's own color instead of the fixed camera purple.
  */
 export function TimelineRouteRow({ route, ctx }: TimelineRouteRowProps) {
-  const drawSec = route.reveal === 'progressive' ? route.drawDurationSec : 0
-  const layout = appearBarLayout({ startSec: route.appear.startSec, fadeInSec: drawSec, holdSec: undefined, fadeOutSec: 0 }, ctx)
+  const segments = chainSegmentsLayout(route.waypoints, ctx, 0, route.appear.startSec)
   const color = route.color
 
   return (
@@ -28,22 +31,17 @@ export function TimelineRouteRow({ route, ctx }: TimelineRouteRowProps) {
         <span className={styles.rowLabelText}>{strings.timeline.routeRow}</span>
       </div>
       <div className={styles.rowTrack}>
-        <div className={styles.bar}>
-          {layout.fadeInPct > 0 && (
-            <div
-              className={styles.barFadeIn}
-              style={{
-                left: `${layout.leftPct}%`,
-                width: `${layout.fadeInPct}%`,
-                background: `linear-gradient(to right, transparent, ${color})`,
-              }}
-            />
-          )}
+        {segments.map((seg, i) => (
           <div
-            className={styles.barHold}
-            style={{ left: `${layout.leftPct + layout.fadeInPct}%`, width: `${layout.holdPct}%`, background: color }}
+            key={i}
+            className={seg.kind === 'hold' ? styles.routeHold : styles.routeTravel}
+            style={{
+              left: `${seg.leftPct}%`,
+              width: `${seg.widthPct}%`,
+              background: seg.kind === 'hold' ? color : stripedBackground(color),
+            }}
           />
-        </div>
+        ))}
       </div>
     </div>
   )

@@ -60,11 +60,26 @@ export interface ChainSegmentLayout extends ChainSegment {
  * (visualized AND draggable — see TimelineSegmentBoundaryHandle.tsx).
  * `minTravelSec` matches whatever floor the chain's own domain uses (see
  * chainSegments()) — 0 for routes, camera.ts's MIN_TRAVEL_SEC for camera.
+ * `offsetSec` shifts the whole chain in project time — the camera's chain
+ * always starts at project time 0 (offset 0, the default); a route's chain
+ * starts at its own appear.startSec, since (unlike the camera) it doesn't
+ * span the whole project timeline. Returned segments' startSec is in
+ * project-time (already includes the offset), matching what routeAnimation
+ * consumes it as.
  */
-export function chainSegmentsLayout(waypoints: ChainWaypoint[], ctx: TimingContext, minTravelSec = 0): ChainSegmentLayout[] {
-  return chainSegments(waypoints, minTravelSec).map((seg) => ({
-    ...seg,
-    leftPct: pct(seg.startSec, ctx.totalSec),
-    widthPct: pct(seg.startSec + seg.durationSec, ctx.totalSec) - pct(seg.startSec, ctx.totalSec),
-  }))
+export function chainSegmentsLayout(
+  waypoints: ChainWaypoint[],
+  ctx: TimingContext,
+  minTravelSec = 0,
+  offsetSec = 0,
+): ChainSegmentLayout[] {
+  return chainSegments(waypoints, minTravelSec).map((seg) => {
+    const startSec = seg.startSec + offsetSec
+    return {
+      ...seg,
+      startSec,
+      leftPct: pct(startSec, ctx.totalSec),
+      widthPct: pct(startSec + seg.durationSec, ctx.totalSec) - pct(startSec, ctx.totalSec),
+    }
+  })
 }

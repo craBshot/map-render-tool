@@ -9,7 +9,13 @@ import { insertRouteWaypoint, waypointsToStraightLine } from '../../map/routeGeo
 import { routeStateAt } from '../../map/routeAnimation'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
-import { createDefaultCameraWaypoint, createDefaultMarker, createDefaultRoute, resolveAreaStyle } from '../../state/types'
+import {
+  createDefaultCameraWaypoint,
+  createDefaultMarker,
+  createDefaultRoute,
+  createDefaultRouteWaypoint,
+  resolveAreaStyle,
+} from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
 import { CameraWaypointMarkers } from './CameraWaypointMarkers'
 import { Crosshair } from './Crosshair'
@@ -101,8 +107,8 @@ export function MapStage() {
 
       if (useEditorStore.getState().pointInteractionMode === 'route') {
         useProjectStore.getState().setProject((p) => {
-          const waypoints = insertRouteWaypoint(p.route?.waypoints ?? [], { lng, lat })
-          const route = p.route ? { ...p.route, waypoints } : createDefaultRoute(waypoints)
+          const waypoints = insertRouteWaypoint(p.route?.waypoints ?? [], createDefaultRouteWaypoint(lng, lat))
+          const route = p.route ? { ...p.route, waypoints, legDistancesM: null } : createDefaultRoute(waypoints)
           return {
             ...p,
             route: route.routingMode === 'straight' ? { ...route, geometry: waypointsToStraightLine(waypoints) } : route,
