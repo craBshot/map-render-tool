@@ -5,6 +5,8 @@ import { areaStateAt } from '../../map/areaAnimation'
 import { camAt, cameraTotalSec } from '../../map/camera'
 import { MapController } from '../../map/MapController'
 import { markerStateAt } from '../../map/markerAnimation'
+import { attachPointDragHandler } from '../../map/pointDrag'
+import { findSnapTarget, kindForInteractionMode } from '../../map/pointHitTest'
 import { insertRouteWaypoint, waypointsToStraightLine } from '../../map/routeGeometry'
 import { routeStateAt } from '../../map/routeAnimation'
 import { useEditorStore } from '../../state/editorStore'
@@ -21,6 +23,7 @@ import { CameraWaypointMarkers } from './CameraWaypointMarkers'
 import { Crosshair } from './Crosshair'
 import { Readout } from './Readout'
 import { RouteWaypointMarkers } from './RouteWaypointMarkers'
+import { SnapIndicator } from './SnapIndicator'
 import styles from './MapStage.module.css'
 
 declare global {
@@ -98,14 +101,20 @@ export function MapStage() {
     const handleContextMenu = (e: MapMouseEvent) => {
       if (useEditorStore.getState().locked) return
       e.originalEvent?.preventDefault()
-      const { lng, lat } = e.lngLat
+      const mode = useEditorStore.getState().pointInteractionMode
 
-      if (useEditorStore.getState().pointInteractionMode === 'area') {
+      // Snap a new point onto an existing point of a DIFFERENT type, if one is close by —
+      // never onto one of the same type (see pointHitTest.ts's findSnapTarget).
+      const kind = kindForInteractionMode(mode)
+      const snap = kind ? findSnapTarget(kind, useProjectStore.getState().project, controller.map, e.lngLat) : null
+      const { lng, lat } = snap ?? e.lngLat
+
+      if (mode === 'area') {
         useEditorStore.getState().setPendingAreaPick({ lng, lat })
         return
       }
 
-      if (useEditorStore.getState().pointInteractionMode === 'route') {
+      if (mode === 'route') {
         useProjectStore.getState().setProject((p) => {
           const waypoints = insertRouteWaypoint(p.route?.waypoints ?? [], createDefaultRouteWaypoint(lng, lat))
           const route = p.route ? { ...p.route, waypoints, legDistancesM: null } : createDefaultRoute(waypoints)
@@ -117,7 +126,7 @@ export function MapStage() {
         return
       }
 
-      if (useEditorStore.getState().pointInteractionMode === 'camera') {
+      if (mode === 'camera') {
         const zr = controller.toRef(controller.map.getZoom())
         useProjectStore.getState().setProject((p) => ({
           ...p,
@@ -132,10 +141,12 @@ export function MapStage() {
       }))
     }
     controller.map.on('contextmenu', handleContextMenu)
+    const detachPointDrag = attachPointDragHandler(controller)
 
     return () => {
       controller.map.off('move', updateReadout)
       controller.map.off('contextmenu', handleContextMenu)
+      detachPointDrag()
       controller.destroy()
       controllerRef.current = null
       useEditorStore.getState().setController(null)
@@ -179,14 +190,20 @@ export function MapStage() {
 
   // Marker content/appearance — rendered statically (sec=null) while editing;
   // camera stays under the user's own pan/zoom, not driven by camAt() here.
+  // While a marker is being dragged, dragPreview substitutes its live
+  // position for the render pass without touching project.markers itself —
+  // the project store is only written once, on drop (see pointDrag.ts).
+  const dragPreview = useEditorStore((s) => s.dragPreview)
   useEffect(() => {
     const controller = controllerRef.current
     if (!controller) return
     const timingCtx: TimingContext = { totalSec: cameraTotalSec(project.camera.waypoints) }
-    controller.renderMarkers(
-      project.markers.map((marker) => ({ marker, frame: markerStateAt(marker, timingCtx, null) })),
-    )
-  }, [project.markers, project.camera.waypoints])
+    const markers =
+      dragPreview?.kind === 'marker'
+        ? project.markers.map((m) => (m.id === dragPreview.id ? { ...m, lng: dragPreview.lng, lat: dragPreview.lat } : m))
+        : project.markers
+    controller.renderMarkers(markers.map((marker) => ({ marker, frame: markerStateAt(marker, timingCtx, null) })))
+  }, [project.markers, project.camera.waypoints, dragPreview])
 
   // Area content/appearance/order — same static (sec=null) editor treatment as markers.
   useEffect(() => {
@@ -217,6 +234,7 @@ export function MapStage() {
         {readout && <Readout lng={readout.lng} lat={readout.lat} zr={readout.zr} />}
         <RouteWaypointMarkers />
         <CameraWaypointMarkers />
+        <SnapIndicator />
       </div>
     </div>
   )

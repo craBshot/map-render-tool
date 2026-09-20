@@ -21,6 +21,7 @@ export function RouteWaypointMarkers() {
   const controller = useEditorStore((s) => s.controller)
   const locked = useEditorStore((s) => s.locked)
   const playing = useEditorStore((s) => s.playing)
+  const dragPreview = useEditorStore((s) => s.dragPreview)
   const [positions, setPositions] = useState<Position[]>([])
 
   useEffect(() => {
@@ -30,7 +31,12 @@ export function RouteWaypointMarkers() {
     }
 
     const update = () => {
-      setPositions(route.waypoints.map((w) => controller.map.project([w.lng, w.lat])))
+      setPositions(
+        route.waypoints.map((w) => {
+          const live = dragPreview?.kind === 'route' && dragPreview.id === w.id ? dragPreview : w
+          return controller.map.project([live.lng, live.lat])
+        }),
+      )
     }
     update()
     controller.map.on('move', update)
@@ -39,7 +45,7 @@ export function RouteWaypointMarkers() {
       controller.map.off('move', update)
       controller.map.off('resize', update)
     }
-  }, [controller, route])
+  }, [controller, route, dragPreview])
 
   if (!route || locked || playing) return null
 
