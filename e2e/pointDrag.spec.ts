@@ -232,3 +232,98 @@ test('dragging a route waypoint never calls OSRM, even in osrm routing mode', as
 
   expect(osrmRequests).toEqual([]) // dragging must never trigger a new OSRM request (fair-use)
 })
+
+async function boxShadow(page: import('@playwright/test').Page, locator: ReturnType<import('@playwright/test').Page['locator']>): Promise<string> {
+  return locator.evaluate((el) => getComputedStyle(el).boxShadow)
+}
+
+test('double-clicking a marker opens the Marker section (collapsed by default) and selects it', async ({ page }) => {
+  await gotoApp(page)
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+  const [marker] = await getMarkers(page)
+
+  const markerSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Marker$/ }) })
+  expect(await markerSection.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false)
+
+  const at = await pagePointFor(page, marker.lng, marker.lat)
+  await page.mouse.dblclick(at.x, at.y)
+
+  await expect(markerSection).toHaveJSProperty('open', true)
+  const card = markerSection.locator('input[placeholder]').first().locator('xpath=ancestor::div[2]')
+  await expect(async () => {
+    expect(await boxShadow(page, card)).not.toBe('none')
+  }).toPass()
+})
+
+test('double-clicking a route waypoint opens the Route section and selects it', async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+  const [wp] = await getRouteWaypoints(page)
+
+  const routeSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Route$/ }) })
+  expect(await routeSection.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false)
+
+  const at = await pagePointFor(page, wp.lng, wp.lat)
+  await page.mouse.dblclick(at.x, at.y)
+
+  await expect(routeSection).toHaveJSProperty('open', true)
+  const card = page.locator('[data-testid="route-waypoint-0"]')
+  await expect(async () => {
+    expect(await boxShadow(page, card)).not.toBe('none')
+  }).toPass()
+})
+
+test('double-clicking a camera waypoint selects it (its section is already open by default)', async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  // A 3rd waypoint away from the 2 defaults, which coincide at the exact same lng/lat and so
+  // would otherwise make "which one gets selected" ambiguous for this test's purposes.
+  await canvas.click({ button: 'right', position: { x: 350, y: 200 } })
+  await expect.poll(() => getCameraWaypoints(page)).toHaveLength(3)
+  const [, , added] = await getCameraWaypoints(page)
+
+  const at = await pagePointFor(page, added.lng, added.lat)
+  await page.mouse.dblclick(at.x, at.y)
+
+  const card = page.locator('[data-testid="camera-waypoint-2"]')
+  await expect(async () => {
+    expect(await boxShadow(page, card)).not.toBe('none')
+  }).toPass()
+})
+
+test('double-clicking a point works regardless of the current interaction mode', async ({ page }) => {
+  await gotoApp(page)
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } }) // marker, placed in default 'marker' mode
+  const [marker] = await getMarkers(page)
+
+  // Switch to Route mode — dragging a marker is blocked here (see the mode-scoping test above),
+  // but double-click-to-edit is explicitly NOT mode-scoped.
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const at = await pagePointFor(page, marker.lng, marker.lat)
+  await page.mouse.dblclick(at.x, at.y)
+
+  const markerSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Marker$/ }) })
+  await expect(markerSection).toHaveJSProperty('open', true)
+})
+
+test('double-clicking empty map space does not open or select anything, and still zooms in (native behavior preserved)', async ({ page }) => {
+  await gotoApp(page)
+  const zoomBefore = await page.evaluate(() => window.__mapController!.map.getZoom())
+
+  // Away from map center — the default project's 2 camera waypoints share the same lng/lat,
+  // which projects to the exact center of the map, so this must double-click somewhere else.
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  const box = await canvas.boundingBox()
+  if (!box) throw new Error('canvas not found')
+  await page.mouse.dblclick(box.x + 40, box.y + 40)
+
+  await expect.poll(async () => page.evaluate(() => window.__mapController!.map.getZoom())).toBeGreaterThan(zoomBefore)
+
+  const markerSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Marker$/ }) })
+  expect(await markerSection.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false)
+})

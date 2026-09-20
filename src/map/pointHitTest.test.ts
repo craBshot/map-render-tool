@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ProjectFile } from '../state/types'
-import { findSnapTarget, hitTestDraggable, kindForInteractionMode, pickNearest, type HitPoint, type Projector } from './pointHitTest'
+import { findSnapTarget, hitTestAnyKind, hitTestDraggable, kindForInteractionMode, pickNearest, type HitPoint, type Projector } from './pointHitTest'
 
 // 1 lng/lat unit == 10px, no rotation/offset — enough to reason about distances without a real map.
 const projector: Projector = { project: ([lng, lat]) => ({ x: lng * 10, y: lat * 10 }) }
@@ -69,6 +69,22 @@ describe('hitTestDraggable', () => {
   it('returns null for area mode', () => {
     const p = project({ markers: [markerAt('m1', 0, 0)] })
     expect(hitTestDraggable('area', p, projector, { x: 0, y: 0 }, 50)).toBeNull()
+  })
+})
+
+describe('hitTestAnyKind', () => {
+  it('finds the nearest point regardless of kind — not mode-scoped like hitTestDraggable', () => {
+    const p = project({
+      markers: [markerAt('m1', 0, 0)],
+      route: routeWith([{ id: 'r1', lng: 5, lat: 0, holdSec: 0, travelSec: 0 }]),
+    })
+    expect(hitTestAnyKind(p, projector, { x: 0, y: 0 }, 5)?.id).toBe('m1')
+    expect(hitTestAnyKind(p, projector, { x: 50, y: 0 }, 5)?.id).toBe('r1')
+  })
+
+  it('returns null when nothing is within radius', () => {
+    const p = project({ markers: [markerAt('m1', 100, 100)] })
+    expect(hitTestAnyKind(p, projector, { x: 0, y: 0 }, 5)).toBeNull()
   })
 })
 

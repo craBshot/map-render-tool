@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { camStaticAt } from '../../map/camera'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
@@ -11,7 +12,14 @@ export function CameraPanel() {
   const waypoints = useProjectStore((s) => s.project.camera.waypoints)
   const setProject = useProjectStore((s) => s.setProject)
   const locked = useEditorStore((s) => s.locked)
+  const selectedObjectId = useEditorStore((s) => s.selectedObjectId)
   const t = strings.camera
+
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  useEffect(() => {
+    if (!selectedObjectId) return
+    cardRefs.current.get(selectedObjectId)?.scrollIntoView({ block: 'nearest' })
+  }, [selectedObjectId])
 
   function updateWaypoint(id: string, fn: (wp: CameraWaypoint) => CameraWaypoint) {
     setProject((p) => ({
@@ -70,7 +78,15 @@ export function CameraPanel() {
         <p className={styles.hint}>{t.pickHint}</p>
 
         {waypoints.map((wp, index) => (
-          <div key={wp.id} className={styles.card} data-testid={`camera-waypoint-${index}`}>
+          <div
+            key={wp.id}
+            ref={(el) => {
+              if (el) cardRefs.current.set(wp.id, el)
+              else cardRefs.current.delete(wp.id)
+            }}
+            className={`${styles.card} ${selectedObjectId === wp.id ? styles.cardSelected : ''}`}
+            data-testid={`camera-waypoint-${index}`}
+          >
             <div className={styles.cardHeader}>
               <span>{waypointLetter(index)}</span>
               <div className={styles.btns}>
