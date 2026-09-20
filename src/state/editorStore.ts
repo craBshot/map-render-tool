@@ -7,6 +7,11 @@ const SIDEBAR_WIDTH_MAX = 600
 const TIMELINE_HEIGHT_MIN = 120
 const TIMELINE_HEIGHT_MAX = 500
 
+export type PointInteractionMode = 'marker' | 'area' | 'route' | 'camera'
+
+/** A point being placed or dragged on the map — the 3 types drag/snap operate over (areas are polygons, not points, so excluded). */
+export type DraggablePointKind = 'marker' | 'route' | 'camera'
+
 /**
  * Ephemeral editor/UI state that must never end up in ProjectFile — it has
  * no bearing on a rendered frame (crosshair visibility, current playback
@@ -28,14 +33,23 @@ interface EditorStore {
   controller: MapController | null
   setController: (controller: MapController | null) => void
   /** What a right-click on the map currently does — set/move the marker, look up an area, extend the route, or add a camera waypoint. */
-  pointInteractionMode: 'marker' | 'area' | 'route' | 'camera'
-  setPointInteractionMode: (mode: 'marker' | 'area' | 'route' | 'camera') => void
+  pointInteractionMode: PointInteractionMode
+  setPointInteractionMode: (mode: PointInteractionMode) => void
   /** Set by a right-click while in 'area' mode; AreaListPanel reacts to it and clears it when done. */
   pendingAreaPick: { lng: number; lat: number } | null
   setPendingAreaPick: (pick: { lng: number; lat: number } | null) => void
   /** Set by clicking a Timeline bar — the matching sidebar card highlights/scrolls into view. */
   selectedObjectId: string | null
   setSelectedObjectId: (id: string | null) => void
+  /**
+   * Live position of a point currently being dragged on the map canvas —
+   * set on mousedown-hit, updated on every mousemove, cleared on mouseup.
+   * Deliberately not project state: written once per gesture (on drop),
+   * not once per frame (see pointDrag.ts) — the project store's setProject
+   * synchronously persists to localStorage on every call.
+   */
+  dragPreview: { kind: DraggablePointKind; id: string; lng: number; lat: number; snapped: boolean } | null
+  setDragPreview: (preview: EditorStore['dragPreview']) => void
   /** Window-layout preference (not project content) — persisted separately, see layoutPersist.ts. */
   sidebarWidthPx: number
   setSidebarWidthPx: (px: number) => void
@@ -63,6 +77,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setPendingAreaPick: (pick) => set({ pendingAreaPick: pick }),
   selectedObjectId: null,
   setSelectedObjectId: (id) => set({ selectedObjectId: id }),
+  dragPreview: null,
+  setDragPreview: (preview) => set({ dragPreview: preview }),
   sidebarWidthPx: initialLayout.sidebarWidthPx,
   setSidebarWidthPx: (px) => {
     const sidebarWidthPx = Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, px))
