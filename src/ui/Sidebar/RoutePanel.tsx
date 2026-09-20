@@ -36,12 +36,15 @@ export function RoutePanel() {
     cardRefs.current.get(selectedObjectId)?.scrollIntoView({ block: 'nearest' })
   }, [selectedObjectId])
 
-  // Double-clicking a route waypoint on the map jumps straight into its hold-time field, text
-  // pre-selected — see pointDoubleClick.ts. One-shot: self-clears once handled.
+  // Double-clicking a route waypoint on the map jumps into its hold-time field; double-clicking
+  // the route LINE between two waypoints (a "leg") jumps into the arriving waypoint's travel-time
+  // field instead (field: 'travelSec') — see pointDoubleClick.ts. One-shot: self-clears once handled.
   const holdFieldRefs = useRef<Map<string, HTMLInputElement>>(new Map())
+  const travelFieldRefs = useRef<Map<string, HTMLInputElement>>(new Map())
   useEffect(() => {
     if (focusFieldRequest?.kind !== 'route') return
-    const el = holdFieldRefs.current.get(focusFieldRequest.id)
+    const refs = focusFieldRequest.field === 'travelSec' ? travelFieldRefs : holdFieldRefs
+    const el = refs.current.get(focusFieldRequest.id)
     if (!el) return
     el.focus()
     el.select()
@@ -182,6 +185,10 @@ export function RoutePanel() {
                         </label>
                         <input
                           id={`routeTravel-${wp.id}`}
+                          ref={(el) => {
+                            if (el) travelFieldRefs.current.set(wp.id, el)
+                            else travelFieldRefs.current.delete(wp.id)
+                          }}
                           type="number"
                           className={styles.input}
                           min={0}

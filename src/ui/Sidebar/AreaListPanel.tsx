@@ -31,6 +31,20 @@ export function AreaListPanel() {
     if (!selectedObjectId) return
     cardRefs.current.get(selectedObjectId)?.scrollIntoView({ block: 'nearest' })
   }, [selectedObjectId])
+
+  // Double-clicking an area polygon on the map jumps straight into its appear-at field, text
+  // pre-selected — see pointDoubleClick.ts. One-shot: self-clears once handled.
+  const focusFieldRequest = useEditorStore((s) => s.focusFieldRequest)
+  const startFieldRefs = useRef<Map<string, HTMLInputElement>>(new Map())
+  useEffect(() => {
+    if (focusFieldRequest?.kind !== 'area') return
+    const el = startFieldRefs.current.get(focusFieldRequest.id)
+    if (!el) return
+    el.focus()
+    el.select()
+    useEditorStore.getState().setFocusFieldRequest(null)
+  }, [focusFieldRequest])
+
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -228,6 +242,10 @@ export function AreaListPanel() {
                 </label>
                 <input
                   id={`areaStart-${area.id}`}
+                  ref={(el) => {
+                    if (el) startFieldRefs.current.set(area.id, el)
+                    else startFieldRefs.current.delete(area.id)
+                  }}
                   type="number"
                   className={styles.input}
                   min={0}

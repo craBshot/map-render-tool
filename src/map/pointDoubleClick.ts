@@ -1,31 +1,36 @@
 import type { MapMouseEvent } from 'maplibre-gl'
-import { useEditorStore, type DraggablePointKind, type SidebarSectionKey } from '../state/editorStore'
+import { useEditorStore, type EditableKind, type SidebarSectionKey } from '../state/editorStore'
 import { useProjectStore } from '../state/store'
 import { hitTestAnyKind } from './pointHitTest'
+import { hitTestArea, hitTestRouteLeg } from './shapeHitTest'
 import type { MapController } from './MapController'
 
-const SECTION_FOR_KIND: Record<DraggablePointKind, SidebarSectionKey> = {
+const SECTION_FOR_KIND: Record<EditableKind, SidebarSectionKey> = {
   marker: 'marker',
   route: 'route',
   camera: 'camera',
+  area: 'areas',
 }
 
 /**
- * Double-click on any point (marker, route waypoint, or camera waypoint)
- * jumps straight to editing it: expands its Sidebar section if collapsed
- * and selects it, reusing the selection highlight/scroll-into-view already
- * wired for markers/areas via Timeline clicks (and, since this feature,
- * camera/route waypoints too — see CameraPanel.tsx/RoutePanel.tsx).
+ * Double-click on any point (marker, route waypoint, camera waypoint), an
+ * area polygon, or the route line itself jumps straight to editing it:
+ * expands its Sidebar section if collapsed, selects it (scrolls into view,
+ * highlights), and focuses its single most relevant field with the value
+ * selected, ready to type over immediately — camera: zoom, route waypoint:
+ * hold time, route LEG (the line between two waypoints, not a waypoint
+ * itself): the arriving waypoint's travel time, marker/area: appear-at.
  *
  * Deliberately NOT mode-scoped like pointDrag.ts's hitTestDraggable — "let
  * me edit whatever's under my cursor" isn't the same ambiguous situation
  * as "which of several overlapping points do I want to move", so any
- * point of any kind is eligible regardless of the current interaction mode.
+ * target is eligible regardless of the current interaction mode.
  *
- * Also fires a one-shot focusFieldRequest — the matching panel's most
- * relevant field (camera: zoom, route: hold time, marker: appear-at)
- * focuses and selects its text, so the user can start typing a new value
- * immediately without an extra click.
+ * Hit-test priority follows the map's own visual stacking (areas render
+ * below the route, which renders below markers/waypoint dots — see
+ * MapController's applyFrame): points first, then the route line, then
+ * areas — matching what a click at an overlap point is actually "looking
+ * at" on screen.
  */
 export function attachDoubleClickEditHandler(controller: MapController): () => void {
   const map = controller.map
@@ -33,14 +38,37 @@ export function attachDoubleClickEditHandler(controller: MapController): () => v
   function onDoubleClick(e: MapMouseEvent) {
     const editor = useEditorStore.getState()
     if (editor.locked || editor.playing) return
+    const project = useProjectStore.getState().project
 
-    const hit = hitTestAnyKind(useProjectStore.getState().project, map, e.point)
-    if (!hit) return // no point under the cursor — let the native double-click-to-zoom proceed
+    const pointHit = hitTestAnyKind(project, map, e.point)
+    if (pointHit) {
+      e.preventDefault() // suppresses MapLibre's default double-click zoom for this click
+      editor.setSidebarSectionOpen(SECTION_FOR_KIND[pointHit.kind], true)
+      editor.setSelectedObjectId(pointHit.id)
+      editor.setFocusFieldRequest({ kind: pointHit.kind, id: pointHit.id })
+      return
+    }
 
-    e.preventDefault() // suppresses MapLibre's default double-click zoom for this click
-    editor.setSidebarSectionOpen(SECTION_FOR_KIND[hit.kind], true)
-    editor.setSelectedObjectId(hit.id)
-    editor.setFocusFieldRequest({ kind: hit.kind, id: hit.id })
+    const legIndex = project.route ? hitTestRouteLeg(project.route, map, e.point) : null
+    if (legIndex !== null && project.route) {
+      const arriving = project.route.waypoints[legIndex + 1]
+      e.preventDefault()
+      editor.setSidebarSectionOpen('route', true)
+      editor.setSelectedObjectId(arriving.id)
+      editor.setFocusFieldRequest({ kind: 'route', id: arriving.id, field: 'travelSec' })
+      return
+    }
+
+    const area = hitTestArea(project, e.lngLat)
+    if (area) {
+      e.preventDefault()
+      editor.setSidebarSectionOpen('areas', true)
+      editor.setSelectedObjectId(area.id)
+      editor.setFocusFieldRequest({ kind: 'area', id: area.id })
+      return
+    }
+
+    // nothing hit — let the native double-click-to-zoom proceed
   }
 
   map.on('dblclick', onDoubleClick)

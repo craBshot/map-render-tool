@@ -44,6 +44,24 @@ async function isRouteVisible(page: import('@playwright/test').Page): Promise<bo
   })
 }
 
+async function isAreaVisible(page: import('@playwright/test').Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const controller = window.__mapController
+    if (!controller) return false
+    const fillLayer = controller.map.getStyle().layers.find((l) => l.id.startsWith('area-') && l.id.endsWith('-fill'))
+    if (!fillLayer) return false
+    return controller.map.getLayoutProperty(fillLayer.id, 'visibility') !== 'none'
+  })
+}
+
+async function getAreas(page: import('@playwright/test').Page): Promise<{ id: string }[]> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem('map-render-tool:project')
+    if (!raw) return []
+    return JSON.parse(raw).areas
+  })
+}
+
 async function getMapCenter(page: import('@playwright/test').Page): Promise<{ lng: number; lat: number }> {
   return page.evaluate(() => {
     const c = window.__mapController!.map.getCenter()
@@ -420,4 +438,53 @@ test('route waypoint labels on the map show hold time only while in Route planen
 
   await page.getByRole('radio', { name: 'Marker setzen' }).click()
   await expect(label).toHaveText('A')
+})
+
+test('double-clicking an area polygon opens the Gebiete section and focuses its appear-at field', async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Gebiet abfragen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+  await page.getByText('Testgebiet — Schutzgebiet').click()
+  await page.getByRole('button', { name: 'Ausgewählte hinzufügen' }).click()
+  await expect.poll(() => isAreaVisible(page)).toBe(true)
+  const [addedArea] = await getAreas(page)
+
+  // The mocked Overpass geometry is a small fixed 0.01°-square around lon 9 / lat 50 (see
+  // fixtures/routeMocks.ts), independent of where the query right-click landed — at the
+  // default project's low zoom that square is under a pixel wide, too small to reliably
+  // double-click. Zoom into it first, same as a real user would need to for such a small area.
+  await page.evaluate(() => window.__mapController!.map.jumpTo({ center: [9.005, 50.005], zoom: 14 }))
+  const at = await pagePointFor(page, 9.005, 50.005)
+  await page.mouse.dblclick(at.x, at.y)
+
+  const gebieteSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Gebiete$/ }) })
+  await expect(gebieteSection).toHaveJSProperty('open', true)
+
+  const fieldId = `areaStart-${addedArea.id}`
+  await expect.poll(() => focusedElementId(page)).toBe(fieldId)
+  await page.keyboard.press('Digit9')
+  await expect(page.locator(`#${fieldId}`)).toHaveValue('9')
+})
+
+test("double-clicking the route line between two waypoints focuses the arriving waypoint's travel-time field", async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 150, y: 120 } }) // A
+  await canvas.click({ button: 'right', position: { x: 350, y: 120 } }) // B (destination)
+  // Straight-line mode so the drawn geometry is exactly [A, B] — deterministic for hit-testing.
+  await openSection(page, 'Route')
+  await page.getByRole('radio', { name: 'Luftlinie' }).click()
+  await expect.poll(() => isRouteVisible(page)).toBe(true)
+
+  const [wpA, wpB] = await getRouteWaypoints(page)
+  const from = await pagePointFor(page, wpA.lng, wpA.lat)
+  const to = await pagePointFor(page, wpB.lng, wpB.lat)
+  await page.mouse.dblclick((from.x + to.x) / 2, (from.y + to.y) / 2) // midpoint of the A-B leg
+
+  const fieldId = `routeTravel-${wpB.id}` // B is the arriving waypoint of the A->B leg
+  await expect.poll(() => focusedElementId(page)).toBe(fieldId)
+  await page.keyboard.press('Digit9')
+  await expect(page.locator(`#${fieldId}`)).toHaveValue('9')
 })
