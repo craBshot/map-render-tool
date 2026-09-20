@@ -327,3 +327,97 @@ test('double-clicking empty map space does not open or select anything, and stil
   const markerSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Marker$/ }) })
   expect(await markerSection.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false)
 })
+
+async function focusedElementId(page: import('@playwright/test').Page): Promise<string | undefined> {
+  return page.evaluate(() => document.activeElement?.id)
+}
+
+test('double-clicking a camera waypoint focuses its zoom field, ready to type over seamlessly', async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 350, y: 200 } })
+  const [, , added] = await getCameraWaypoints(page)
+
+  const at = await pagePointFor(page, added.lng, added.lat)
+  await page.mouse.dblclick(at.x, at.y)
+
+  const fieldId = `camZoom-${added.id}`
+  await expect.poll(() => focusedElementId(page)).toBe(fieldId)
+  // Typing must REPLACE the old value, not append to it — the whole point of
+  // pre-selecting the text (number inputs don't expose selectionStart/End via
+  // JS, so this behavioral check is the only reliable way to verify it here).
+  await page.keyboard.press('Digit9')
+  await expect(page.locator(`#${fieldId}`)).toHaveValue('9')
+})
+
+test('double-clicking a route waypoint focuses its hold-time field, ready to type over seamlessly', async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+  const [wp] = await getRouteWaypoints(page)
+
+  const at = await pagePointFor(page, wp.lng, wp.lat)
+  await page.mouse.dblclick(at.x, at.y)
+
+  const fieldId = `routeHold-${wp.id}`
+  await expect.poll(() => focusedElementId(page)).toBe(fieldId)
+  await page.keyboard.press('Digit9')
+  await expect(page.locator(`#${fieldId}`)).toHaveValue('9')
+})
+
+test('double-clicking a marker focuses its appear-at field, ready to type over seamlessly', async ({ page }) => {
+  await gotoApp(page)
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+  const [marker] = await getMarkers(page)
+
+  const at = await pagePointFor(page, marker.lng, marker.lat)
+  await page.mouse.dblclick(at.x, at.y)
+
+  const fieldId = `markerStart-${marker.id}`
+  await expect.poll(() => focusedElementId(page)).toBe(fieldId)
+  await page.keyboard.press('Digit9')
+  await expect(page.locator(`#${fieldId}`)).toHaveValue('9')
+})
+
+test('the selection highlight gives the whole card a tinted background, not just a thin border', async ({ page }) => {
+  await gotoApp(page)
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+  const [marker] = await getMarkers(page)
+  const at = await pagePointFor(page, marker.lng, marker.lat)
+  await page.mouse.dblclick(at.x, at.y)
+
+  const markerSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Marker$/ }) })
+  const card = markerSection.locator('input[placeholder]').first().locator('xpath=ancestor::div[2]')
+  await expect(async () => {
+    const bg = await card.evaluate((el) => getComputedStyle(el).backgroundColor)
+    expect(bg).not.toBe('rgb(255, 255, 255)')
+    expect(bg).not.toBe('rgba(0, 0, 0, 0)')
+  }).toPass()
+})
+
+test('camera waypoint labels on the map show zoom + hold only while in Kameraflug mode', async ({ page }) => {
+  await gotoApp(page)
+  const label = page.locator('[data-testid="camera-waypoint-label-0"]')
+
+  await expect(label).not.toContainText('Zoom')
+
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
+  await expect(label).toContainText('Zoom')
+})
+
+test('route waypoint labels on the map show hold time only while in Route planen mode', async ({ page }) => {
+  await gotoApp(page)
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+
+  const label = page.locator('[data-testid="route-waypoint-label-0"]')
+  await expect(label).toContainText('s') // "A · 1,0s" while still in Route mode
+
+  await page.getByRole('radio', { name: 'Marker setzen' }).click()
+  await expect(label).toHaveText('A')
+})

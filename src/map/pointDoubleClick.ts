@@ -21,6 +21,11 @@ const SECTION_FOR_KIND: Record<DraggablePointKind, SidebarSectionKey> = {
  * me edit whatever's under my cursor" isn't the same ambiguous situation
  * as "which of several overlapping points do I want to move", so any
  * point of any kind is eligible regardless of the current interaction mode.
+ *
+ * Also fires a one-shot focusFieldRequest — the matching panel's most
+ * relevant field (camera: zoom, route: hold time, marker: appear-at)
+ * focuses and selects its text, so the user can start typing a new value
+ * immediately without an extra click.
  */
 export function attachDoubleClickEditHandler(controller: MapController): () => void {
   const map = controller.map
@@ -35,6 +40,7 @@ export function attachDoubleClickEditHandler(controller: MapController): () => v
     e.preventDefault() // suppresses MapLibre's default double-click zoom for this click
     editor.setSidebarSectionOpen(SECTION_FOR_KIND[hit.kind], true)
     editor.setSelectedObjectId(hit.id)
+    editor.setFocusFieldRequest({ kind: hit.kind, id: hit.id })
   }
 
   map.on('dblclick', onDoubleClick)

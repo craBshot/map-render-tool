@@ -28,6 +28,7 @@ export const de = {
     show: 'Anzeigen',
     holdSec: 'Verweilzeit (s)',
     travelSec: 'Flugzeit (s)',
+    zoom: 'Zoom',
     addWaypoint: 'Wegpunkt hinzufügen',
     deleteWaypoint: 'Wegpunkt löschen',
     moveUp: 'Nach oben',

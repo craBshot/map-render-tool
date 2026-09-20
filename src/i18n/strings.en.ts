@@ -33,6 +33,7 @@ export const en: typeof de = {
     show: 'Show',
     holdSec: 'Hold (s)',
     travelSec: 'Travel time (s)',
+    zoom: 'Zoom',
     addWaypoint: 'Add waypoint',
     deleteWaypoint: 'Delete waypoint',
     moveUp: 'Move up',

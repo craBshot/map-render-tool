@@ -27,6 +27,7 @@ export function RoutePanel() {
   const setProject = useProjectStore((s) => s.setProject)
   const locked = useEditorStore((s) => s.locked)
   const selectedObjectId = useEditorStore((s) => s.selectedObjectId)
+  const focusFieldRequest = useEditorStore((s) => s.focusFieldRequest)
   const t = strings.route
 
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -34,6 +35,18 @@ export function RoutePanel() {
     if (!selectedObjectId) return
     cardRefs.current.get(selectedObjectId)?.scrollIntoView({ block: 'nearest' })
   }, [selectedObjectId])
+
+  // Double-clicking a route waypoint on the map jumps straight into its hold-time field, text
+  // pre-selected — see pointDoubleClick.ts. One-shot: self-clears once handled.
+  const holdFieldRefs = useRef<Map<string, HTMLInputElement>>(new Map())
+  useEffect(() => {
+    if (focusFieldRequest?.kind !== 'route') return
+    const el = holdFieldRefs.current.get(focusFieldRequest.id)
+    if (!el) return
+    el.focus()
+    el.select()
+    useEditorStore.getState().setFocusFieldRequest(null)
+  }, [focusFieldRequest])
 
   const [calculating, setCalculating] = useState(false)
   const [error, setError] = useState('')
@@ -113,7 +126,7 @@ export function RoutePanel() {
 
         {route && (
           <>
-            <div className={styles.card}>
+            <div>
               {route.waypoints.map((wp, index) => (
                 <div
                   key={wp.id}
@@ -121,7 +134,7 @@ export function RoutePanel() {
                     if (el) cardRefs.current.set(wp.id, el)
                     else cardRefs.current.delete(wp.id)
                   }}
-                  className={selectedObjectId === wp.id ? styles.cardSelected : undefined}
+                  className={`${styles.card} ${selectedObjectId === wp.id ? styles.cardSelected : ''}`}
                   data-testid={`route-waypoint-${index}`}
                 >
                   <div className={styles.cardHeader}>
@@ -186,6 +199,10 @@ export function RoutePanel() {
                       </label>
                       <input
                         id={`routeHold-${wp.id}`}
+                        ref={(el) => {
+                          if (el) holdFieldRefs.current.set(wp.id, el)
+                          else holdFieldRefs.current.delete(wp.id)
+                        }}
                         type="number"
                         className={styles.input}
                         min={0}

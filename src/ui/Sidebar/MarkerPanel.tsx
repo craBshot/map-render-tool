@@ -19,6 +19,19 @@ export function MarkerPanel() {
     cardRefs.current.get(selectedObjectId)?.scrollIntoView({ block: 'nearest' })
   }, [selectedObjectId])
 
+  // Double-clicking a marker on the map jumps straight into its appear-at field, text
+  // pre-selected — see pointDoubleClick.ts. One-shot: self-clears once handled.
+  const focusFieldRequest = useEditorStore((s) => s.focusFieldRequest)
+  const startFieldRefs = useRef<Map<string, HTMLInputElement>>(new Map())
+  useEffect(() => {
+    if (focusFieldRequest?.kind !== 'marker') return
+    const el = startFieldRefs.current.get(focusFieldRequest.id)
+    if (!el) return
+    el.focus()
+    el.select()
+    useEditorStore.getState().setFocusFieldRequest(null)
+  }, [focusFieldRequest])
+
   function updateMarker(id: string, fn: (m: MarkerObject) => MarkerObject) {
     setProject((p) => ({ ...p, markers: p.markers.map((m) => (m.id === id ? fn(m) : m)) }))
   }
@@ -139,6 +152,10 @@ export function MarkerPanel() {
                 </label>
                 <input
                   id={`markerStart-${marker.id}`}
+                  ref={(el) => {
+                    if (el) startFieldRefs.current.set(marker.id, el)
+                    else startFieldRefs.current.delete(marker.id)
+                  }}
                   type="number"
                   className={styles.input}
                   min={0}

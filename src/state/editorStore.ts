@@ -69,6 +69,14 @@ interface EditorStore {
   /** Which Sidebar sections are expanded — not persisted, resets to DEFAULT_OPEN_SIDEBAR_SECTIONS on reload. */
   openSidebarSections: Record<SidebarSectionKey, boolean>
   setSidebarSectionOpen: (key: SidebarSectionKey, open: boolean) => void
+  /**
+   * Set by double-clicking a map point — the matching field in the matching
+   * panel (see pointDoubleClick.ts's kind->field mapping) focuses itself and
+   * selects its current text, then clears this back to null itself (a
+   * one-shot signal, not a persistent "this field is focused" state).
+   */
+  focusFieldRequest: { kind: DraggablePointKind; id: string } | null
+  setFocusFieldRequest: (request: EditorStore['focusFieldRequest']) => void
   /** Window-layout preference (not project content) — persisted separately, see layoutPersist.ts. */
   sidebarWidthPx: number
   setSidebarWidthPx: (px: number) => void
@@ -100,6 +108,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setDragPreview: (preview) => set({ dragPreview: preview }),
   openSidebarSections: DEFAULT_OPEN_SIDEBAR_SECTIONS,
   setSidebarSectionOpen: (key, open) => set((state) => ({ openSidebarSections: { ...state.openSidebarSections, [key]: open } })),
+  focusFieldRequest: null,
+  setFocusFieldRequest: (request) => set({ focusFieldRequest: request }),
   sidebarWidthPx: initialLayout.sidebarWidthPx,
   setSidebarWidthPx: (px) => {
     const sidebarWidthPx = Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, px))

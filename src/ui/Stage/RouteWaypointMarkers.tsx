@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
-import { waypointLetter } from '../format'
+import { fmtNum, waypointLetter } from '../format'
 import styles from './RouteWaypointMarkers.module.css'
 
 interface Position {
@@ -15,6 +15,9 @@ interface Position {
  * positions on the map. Pure DOM overlay — like Crosshair/Readout, this is
  * never part of the export canvas and needs no style-reload handling, since
  * it only depends on map.project(), not on any MapLibre layer.
+ *
+ * While in Route mode, the label also shows the waypoint's hold time —
+ * decluttered away in other modes, where it isn't the thing being edited.
  */
 export function RouteWaypointMarkers() {
   const route = useProjectStore((s) => s.project.route)
@@ -22,6 +25,7 @@ export function RouteWaypointMarkers() {
   const locked = useEditorStore((s) => s.locked)
   const playing = useEditorStore((s) => s.playing)
   const dragPreview = useEditorStore((s) => s.dragPreview)
+  const mode = useEditorStore((s) => s.pointInteractionMode)
   const [positions, setPositions] = useState<Position[]>([])
 
   useEffect(() => {
@@ -54,7 +58,9 @@ export function RouteWaypointMarkers() {
       {positions.map((pos, index) => (
         <div key={index} className={styles.waypoint} style={{ left: pos.x, top: pos.y }}>
           <span className={styles.dot} />
-          <span className={styles.label}>{waypointLetter(index)}</span>
+          <span className={styles.label} data-testid={`route-waypoint-label-${index}`}>
+            {mode === 'route' ? `${waypointLetter(index)} · ${fmtNum(route!.waypoints[index].holdSec, 1)}s` : waypointLetter(index)}
+          </span>
         </div>
       ))}
     </>
