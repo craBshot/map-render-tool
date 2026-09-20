@@ -255,7 +255,12 @@ export function createDefaultRouteWaypoint(
     id: generateId(),
     lng,
     lat,
-    holdSec: 0,
+    // Non-zero (matches CameraPanel's own default) so a freshly-created
+    // waypoint's hold segment has real, visible, grabbable width on the
+    // Timeline immediately — a 0-duration segment's handle is reachable
+    // (see declutterHandlePositions) but easy to miss without deliberately
+    // hunting for it.
+    holdSec: 1,
     travelSec: 3, // matches today's default drawDurationSec
     ...overrides,
   }

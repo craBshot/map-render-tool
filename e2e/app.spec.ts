@@ -407,7 +407,7 @@ test('route: dragging a segment boundary on the Timeline changes that leg\'s tra
   expect(afterDrag.travelSec).toBeCloseTo(originalTravelSec + 0.1 * 7, 0)
 })
 
-test('route: with default (0s) holds, a middle waypoint\'s hold handle is independently draggable (regression: must not be masked by the adjacent travel handle)', async ({
+test('route: a 0s hold is still independently draggable (regression: must not be masked by the adjacent travel handle)', async ({
   page,
 }) => {
   await gotoApp(page)
@@ -419,8 +419,15 @@ test('route: with default (0s) holds, a middle waypoint\'s hold handle is indepe
   await canvas.click({ button: 'right', position: { x: 200, y: 200 } }) // inserted before destination (B)
   await expect.poll(() => getRouteWaypoints(page)).toHaveLength(3)
 
+  // Force the exact coincidence scenario: B's hold at 0s (waypoints default
+  // to holdSec: 1 now, precisely so this doesn't happen by accident — but a
+  // user can still explicitly set one to 0, and that must stay draggable).
+  const [, waypointBBefore] = await getRouteWaypoints(page)
+  await page.locator(`#routeHold-${waypointBBefore.id}`).fill('0')
+  await expect.poll(async () => (await getRouteWaypoints(page))[1].holdSec).toBe(0)
+
   const [, waypointB] = await getRouteWaypoints(page)
-  const originalHoldB = waypointB.holdSec // 0 — the default that used to make this handle unreachable
+  const originalHoldB = waypointB.holdSec // 0 — forced above, the value that used to make this handle unreachable
   const originalTravelB = waypointB.travelSec
 
   const holdHandle = page.locator(`[data-testid="route-boundary-${waypointB.id}-hold"]`)
