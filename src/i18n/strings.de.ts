@@ -113,6 +113,7 @@ export const de = {
     addStyle: 'Stil hinzufügen',
     deleteStyle: 'Stil löschen',
     name: 'Name',
+    lockedDefaultName: 'Default',
     fill: 'Füllung',
     fillColor: 'Füllfarbe',
     fillOpacity: 'Deckkraft',
