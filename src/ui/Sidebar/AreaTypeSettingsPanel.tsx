@@ -24,8 +24,8 @@ export function AreaTypeSettingsPanel() {
   const kindLabels = strings.area.kinds
 
   return (
-    <section className={styles.section}>
-      <h2 className={styles.heading}>{t.heading}</h2>
+    <details className={styles.section} open>
+      <summary className={styles.heading}>{t.heading}</summary>
       <p className={styles.hint}>{t.hint}</p>
       {KIND_KEYS.map((kind) => (
         <label key={kind} className={styles.check}>
@@ -37,6 +37,6 @@ export function AreaTypeSettingsPanel() {
           {kindLabels[kind]}
         </label>
       ))}
-    </section>
+    </details>
   )
 }

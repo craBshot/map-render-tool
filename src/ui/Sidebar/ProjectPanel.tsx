@@ -18,8 +18,8 @@ export function ProjectPanel() {
   }
 
   return (
-    <section className={styles.section}>
-      <h2 className={styles.heading}>{t.heading}</h2>
+    <details className={styles.section} open>
+      <summary className={styles.heading}>{t.heading}</summary>
       <fieldset className={styles.fieldset} disabled={locked}>
         <div className={styles.btns}>
           <button type="button" className={styles.button} onClick={resetProject}>
@@ -28,6 +28,6 @@ export function ProjectPanel() {
         </div>
         <p className={styles.hint}>{t.resetHint}</p>
       </fieldset>
-    </section>
+    </details>
   )
 }

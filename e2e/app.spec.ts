@@ -149,7 +149,7 @@ test('marker: deleting one from the panel removes its map layers, not just its d
 
   // Scope to the Marker panel's own section — the camera panel also has ✕ delete
   // buttons (for waypoints), just disabled at the default 2-waypoint minimum.
-  const markerSection = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Marker', exact: true } ) })
+  const markerSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Marker$/ }) })
   await markerSection.getByRole('button', { name: '✕' }).first().click()
   await expect.poll(() => markerDotCount(page)).toBe(1)
 
@@ -226,7 +226,7 @@ test('timeline: dragging a marker\'s bar changes its startSec, and a plain click
 
   // A plain click (down+up at the same point, no movement) selects instead of repositioning —
   // the matching sidebar card gets a visible highlight (border/box-shadow using --accent).
-  const markerSection = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Marker', exact: true }) })
+  const markerSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Marker$/ }) })
   const card = markerSection.locator('input[placeholder]').first().locator('xpath=ancestor::div[2]')
   const boxShadowBefore = await card.evaluate((el) => getComputedStyle(el).boxShadow)
 

@@ -17,8 +17,8 @@ export function StylePanel() {
   }
 
   return (
-    <section className={styles.section}>
-      <h2 className={styles.heading}>{t.heading}</h2>
+    <details className={styles.section} open>
+      <summary className={styles.heading}>{t.heading}</summary>
       <fieldset className={styles.fieldset} disabled={locked}>
         <label className={styles.label} htmlFor="mapStyle">
           {t.mapStyle}
@@ -65,6 +65,6 @@ export function StylePanel() {
           {t.hideMinor}
         </label>
       </fieldset>
-    </section>
+    </details>
   )
 }

@@ -48,8 +48,8 @@ export function SearchPanel() {
   }
 
   return (
-    <section className={styles.section}>
-      <h2 className={styles.heading}>{t.heading}</h2>
+    <details className={styles.section} open>
+      <summary className={styles.heading}>{t.heading}</summary>
       <div className={styles.searchRow}>
         <input
           type="text"
@@ -68,6 +68,6 @@ export function SearchPanel() {
         </button>
       </div>
       {message && <p className={isError ? styles.msgErr : styles.msg}>{message}</p>}
-    </section>
+    </details>
   )
 }
