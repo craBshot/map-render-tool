@@ -20,12 +20,16 @@ export type EditableKind = DraggablePointKind | 'area'
 
 const DEFAULT_OPEN_SIDEBAR_SECTIONS: Record<SidebarSectionKey, boolean> = {
   search: false,
-  camera: true, // the one section open by default — everything else is a specialized tool, camera is the one you always need
+  // Sidebar.tsx only ever renders one of camera/marker/route (or the 3 area panels) at a time,
+  // matching the current interaction mode — so each mode's PRIMARY panel defaults open (no extra
+  // click needed for the one thing that's already contextually relevant). areaStyles/areaTypes
+  // are secondary/config panels within the area-mode group and stay collapsed either way.
+  camera: true,
   style: false,
-  marker: false,
-  areas: false,
+  marker: true,
+  areas: true,
   areaStyles: false,
-  route: false,
+  route: true,
   export: false,
   areaTypes: false,
   project: false,

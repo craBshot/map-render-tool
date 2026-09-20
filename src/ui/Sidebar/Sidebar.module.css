@@ -18,3 +18,23 @@
   margin: 0 0 18px;
   line-height: 1.4;
 }
+
+/* Tinted per the active interaction mode (index.css's --mode-*-bg tokens) — the panel(s) inside
+   are the only thing rendered here, swapped by Sidebar.tsx based on pointInteractionMode. */
+.modeSection {
+  padding: 4px 12px;
+  margin: 0 0 8px;
+  border-radius: 10px;
+}
+.modeSection[data-mode='marker'] {
+  background: var(--mode-marker-bg);
+}
+.modeSection[data-mode='route'] {
+  background: var(--mode-route-bg);
+}
+.modeSection[data-mode='area'] {
+  background: var(--mode-area-bg);
+}
+.modeSection[data-mode='camera'] {
+  background: var(--mode-camera-bg);
+}

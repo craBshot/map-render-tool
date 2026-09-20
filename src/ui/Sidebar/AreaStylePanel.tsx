@@ -33,6 +33,11 @@ export function AreaStylePanel() {
     }))
   }
 
+  // The last remaining style can't be deleted (areas must always have >=1 style to pick from) —
+  // while it's the sole one, it also can't be renamed, so it stays recognizable as "the permanent
+  // fallback" rather than looking like an arbitrarily-named survivor.
+  const isLastRemaining = areaStyles.length <= 1
+
   return (
     <CollapsibleSection sectionKey="areaStyles" heading={t.heading}>
       <fieldset className={styles.fieldset} disabled={locked}>
@@ -42,10 +47,17 @@ export function AreaStylePanel() {
               <input
                 type="text"
                 className={styles.input}
-                value={style.name}
+                value={isLastRemaining ? t.lockedDefaultName : style.name}
+                disabled={isLastRemaining}
                 onChange={(e) => updateStyle(style.id, (s) => ({ ...s, name: e.target.value }))}
               />
-              <button type="button" className={styles.iconButton} onClick={() => deleteStyle(style.id)} title={t.deleteStyle}>
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={() => deleteStyle(style.id)}
+                disabled={isLastRemaining}
+                title={t.deleteStyle}
+              >
                 ✕
               </button>
             </div>

@@ -304,6 +304,25 @@ test('area pick hits the local database and never calls live Overpass', async ({
   expect(overpassRequests).toEqual([])
 })
 
+test('area style: the last remaining style cannot be deleted or renamed, and displays as "Default"', async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Gebiet abfragen' }).click()
+  await openSection(page, 'Gebiets-Stile')
+
+  const styleSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Gebiets-Stile$/ }) })
+  const deleteButtons = styleSection.getByRole('button', { name: '✕' })
+  const nameInputs = styleSection.locator('input[type="text"]')
+  await expect(deleteButtons).toHaveCount(2) // default project seeds 2 starter styles
+  await expect(nameInputs.first()).toBeEditable()
+
+  await deleteButtons.first().click()
+  await expect(deleteButtons).toHaveCount(1)
+  await expect(deleteButtons).toBeDisabled()
+  await expect(nameInputs).toHaveCount(1)
+  await expect(nameInputs).toBeDisabled()
+  await expect(nameInputs).toHaveValue('Default')
+})
+
 test('route: multiple right-clicks set waypoints, calculating via OSRM renders the line, and it survives a style change', async ({
   page,
 }) => {
@@ -401,6 +420,45 @@ test('route: a third and fourth click insert before the destination, which stays
   expect(afterFourth[0]).toEqual(start)
   expect(afterFourth[1]).toEqual(thirdClickPoint) // earlier via-point keeps its place
   expect(afterFourth[3]).toEqual(destination) // destination is still last
+})
+
+test('route: deleting a waypoint does not crash the app (regression: stale on-map positions array indexed out of bounds)', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (err) => errors.push(err.message))
+
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 150, y: 120 } })
+  await canvas.click({ button: 'right', position: { x: 250, y: 160 } })
+  await canvas.click({ button: 'right', position: { x: 200, y: 200 } })
+  await expect.poll(() => getRouteWaypoints(page)).toHaveLength(3)
+
+  const routeSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Route$/ }) })
+  await routeSection.getByRole('button', { name: '✕' }).first().click()
+
+  await expect.poll(() => getRouteWaypoints(page)).toHaveLength(2)
+  expect(errors).toEqual([])
+  // The app must still be alive and interactive, not a blank/crashed page.
+  await expect(canvas).toBeVisible()
+  await expect(routeSection).toBeVisible()
+})
+
+test('camera: deleting a waypoint does not crash the app (same class of bug as the route one above)', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (err) => errors.push(err.message))
+
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 350, y: 200 } })
+  await expect.poll(() => getCameraWaypoints(page)).toHaveLength(3)
+
+  await page.locator('[data-testid="camera-waypoint-2"]').getByRole('button', { name: '✕' }).click()
+
+  await expect.poll(() => getCameraWaypoints(page)).toHaveLength(2)
+  expect(errors).toEqual([])
+  await expect(canvas).toBeVisible()
 })
 
 test('route: dragging a segment boundary on the Timeline changes that leg\'s travelSec', async ({ page }) => {
@@ -603,6 +661,7 @@ test('marker: dragging the fadeIn edge changes fadeInSec; unchecking hold-foreve
 
 test('preview runs and advances the time readout', async ({ page }) => {
   await gotoApp(page)
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
 
   await page.locator('[data-testid="camera-waypoint-0"]').getByLabel('Verweilzeit (s)').fill('0.2')
   await page.locator('[data-testid="camera-waypoint-1"]').getByLabel('Flugzeit (s)').fill('0.5')
@@ -622,6 +681,7 @@ test('preview runs and advances the time readout', async ({ page }) => {
 
 test('mp4 export produces a valid file with the correct frame count', async ({ page }) => {
   await gotoApp(page)
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
 
   const holdStart = 0.2
   const zoomDuration = 0.5 // >= the 0.5s minimum camera.ts clamps travel legs to

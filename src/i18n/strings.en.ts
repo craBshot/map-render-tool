@@ -118,6 +118,7 @@ export const en: typeof de = {
     addStyle: 'Add style',
     deleteStyle: 'Delete style',
     name: 'Name',
+    lockedDefaultName: 'Default',
     fill: 'Fill',
     fillColor: 'Fill color',
     fillOpacity: 'Opacity',

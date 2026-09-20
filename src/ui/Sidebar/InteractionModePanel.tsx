@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { useEditorStore } from '../../state/editorStore'
 import { strings } from '../../i18n'
 import styles from './InteractionModePanel.module.css'
@@ -17,6 +18,7 @@ export function InteractionModePanel() {
           role="radio"
           aria-checked={mode === value}
           className={mode === value ? styles.active : styles.button}
+          style={{ '--mode-btn-color': `var(--mode-${value})` } as CSSProperties}
           disabled={locked}
           onClick={() => useEditorStore.getState().setPointInteractionMode(value)}
         >
