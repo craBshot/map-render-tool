@@ -44,6 +44,24 @@ async function isRouteVisible(page: import('@playwright/test').Page): Promise<bo
   })
 }
 
+async function isAreaVisible(page: import('@playwright/test').Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const controller = window.__mapController
+    if (!controller) return false
+    const fillLayer = controller.map.getStyle().layers.find((l) => l.id.startsWith('area-') && l.id.endsWith('-fill'))
+    if (!fillLayer) return false
+    return controller.map.getLayoutProperty(fillLayer.id, 'visibility') !== 'none'
+  })
+}
+
+async function getAreas(page: import('@playwright/test').Page): Promise<{ id: string }[]> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem('map-render-tool:project')
+    if (!raw) return []
+    return JSON.parse(raw).areas
+  })
+}
+
 async function getMapCenter(page: import('@playwright/test').Page): Promise<{ lng: number; lat: number }> {
   return page.evaluate(() => {
     const c = window.__mapController!.map.getCenter()
@@ -326,4 +344,147 @@ test('double-clicking empty map space does not open or select anything, and stil
 
   const markerSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Marker$/ }) })
   expect(await markerSection.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false)
+})
+
+async function focusedElementId(page: import('@playwright/test').Page): Promise<string | undefined> {
+  return page.evaluate(() => document.activeElement?.id)
+}
+
+test('double-clicking a camera waypoint focuses its zoom field, ready to type over seamlessly', async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 350, y: 200 } })
+  const [, , added] = await getCameraWaypoints(page)
+
+  const at = await pagePointFor(page, added.lng, added.lat)
+  await page.mouse.dblclick(at.x, at.y)
+
+  const fieldId = `camZoom-${added.id}`
+  await expect.poll(() => focusedElementId(page)).toBe(fieldId)
+  // Typing must REPLACE the old value, not append to it — the whole point of
+  // pre-selecting the text (number inputs don't expose selectionStart/End via
+  // JS, so this behavioral check is the only reliable way to verify it here).
+  await page.keyboard.press('Digit9')
+  await expect(page.locator(`#${fieldId}`)).toHaveValue('9')
+})
+
+test('double-clicking a route waypoint focuses its hold-time field, ready to type over seamlessly', async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+  const [wp] = await getRouteWaypoints(page)
+
+  const at = await pagePointFor(page, wp.lng, wp.lat)
+  await page.mouse.dblclick(at.x, at.y)
+
+  const fieldId = `routeHold-${wp.id}`
+  await expect.poll(() => focusedElementId(page)).toBe(fieldId)
+  await page.keyboard.press('Digit9')
+  await expect(page.locator(`#${fieldId}`)).toHaveValue('9')
+})
+
+test('double-clicking a marker focuses its appear-at field, ready to type over seamlessly', async ({ page }) => {
+  await gotoApp(page)
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+  const [marker] = await getMarkers(page)
+
+  const at = await pagePointFor(page, marker.lng, marker.lat)
+  await page.mouse.dblclick(at.x, at.y)
+
+  const fieldId = `markerStart-${marker.id}`
+  await expect.poll(() => focusedElementId(page)).toBe(fieldId)
+  await page.keyboard.press('Digit9')
+  await expect(page.locator(`#${fieldId}`)).toHaveValue('9')
+})
+
+test('the selection highlight gives the whole card a tinted background, not just a thin border', async ({ page }) => {
+  await gotoApp(page)
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+  const [marker] = await getMarkers(page)
+  const at = await pagePointFor(page, marker.lng, marker.lat)
+  await page.mouse.dblclick(at.x, at.y)
+
+  const markerSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Marker$/ }) })
+  const card = markerSection.locator('input[placeholder]').first().locator('xpath=ancestor::div[2]')
+  await expect(async () => {
+    const bg = await card.evaluate((el) => getComputedStyle(el).backgroundColor)
+    expect(bg).not.toBe('rgb(255, 255, 255)')
+    expect(bg).not.toBe('rgba(0, 0, 0, 0)')
+  }).toPass()
+})
+
+test('camera waypoint labels on the map show zoom + hold only while in Kameraflug mode', async ({ page }) => {
+  await gotoApp(page)
+  const label = page.locator('[data-testid="camera-waypoint-label-0"]')
+
+  await expect(label).not.toContainText('Zoom')
+
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
+  await expect(label).toContainText('Zoom')
+})
+
+test('route waypoint labels on the map show hold time only while in Route planen mode', async ({ page }) => {
+  await gotoApp(page)
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+
+  const label = page.locator('[data-testid="route-waypoint-label-0"]')
+  await expect(label).toContainText('s') // "A · 1,0s" while still in Route mode
+
+  await page.getByRole('radio', { name: 'Marker setzen' }).click()
+  await expect(label).toHaveText('A')
+})
+
+test('double-clicking an area polygon opens the Gebiete section and focuses its appear-at field', async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Gebiet abfragen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+  await page.getByText('Testgebiet — Schutzgebiet').click()
+  await page.getByRole('button', { name: 'Ausgewählte hinzufügen' }).click()
+  await expect.poll(() => isAreaVisible(page)).toBe(true)
+  const [addedArea] = await getAreas(page)
+
+  // The mocked Overpass geometry is a small fixed 0.01°-square around lon 9 / lat 50 (see
+  // fixtures/routeMocks.ts), independent of where the query right-click landed — at the
+  // default project's low zoom that square is under a pixel wide, too small to reliably
+  // double-click. Zoom into it first, same as a real user would need to for such a small area.
+  await page.evaluate(() => window.__mapController!.map.jumpTo({ center: [9.005, 50.005], zoom: 14 }))
+  const at = await pagePointFor(page, 9.005, 50.005)
+  await page.mouse.dblclick(at.x, at.y)
+
+  const gebieteSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Gebiete$/ }) })
+  await expect(gebieteSection).toHaveJSProperty('open', true)
+
+  const fieldId = `areaStart-${addedArea.id}`
+  await expect.poll(() => focusedElementId(page)).toBe(fieldId)
+  await page.keyboard.press('Digit9')
+  await expect(page.locator(`#${fieldId}`)).toHaveValue('9')
+})
+
+test("double-clicking the route line between two waypoints focuses the arriving waypoint's travel-time field", async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 150, y: 120 } }) // A
+  await canvas.click({ button: 'right', position: { x: 350, y: 120 } }) // B (destination)
+  // Straight-line mode so the drawn geometry is exactly [A, B] — deterministic for hit-testing.
+  await openSection(page, 'Route')
+  await page.getByRole('radio', { name: 'Luftlinie' }).click()
+  await expect.poll(() => isRouteVisible(page)).toBe(true)
+
+  const [wpA, wpB] = await getRouteWaypoints(page)
+  const from = await pagePointFor(page, wpA.lng, wpA.lat)
+  const to = await pagePointFor(page, wpB.lng, wpB.lat)
+  await page.mouse.dblclick((from.x + to.x) / 2, (from.y + to.y) / 2) // midpoint of the A-B leg
+
+  const fieldId = `routeTravel-${wpB.id}` // B is the arriving waypoint of the A->B leg
+  await expect.poll(() => focusedElementId(page)).toBe(fieldId)
+  await page.keyboard.press('Digit9')
+  await expect(page.locator(`#${fieldId}`)).toHaveValue('9')
 })

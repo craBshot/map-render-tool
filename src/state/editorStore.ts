@@ -15,6 +15,9 @@ export type DraggablePointKind = 'marker' | 'route' | 'camera'
 /** One entry per collapsible Sidebar section (see CollapsibleSection.tsx) — keyed by the panel it belongs to. */
 export type SidebarSectionKey = 'search' | 'camera' | 'style' | 'marker' | 'areas' | 'areaStyles' | 'route' | 'export' | 'areaTypes' | 'project'
 
+/** Everything double-click-to-edit (pointDoubleClick.ts) can land on — a superset of DraggablePointKind, since areas (and the route line itself) are double-click targets too despite not being draggable points. */
+export type EditableKind = DraggablePointKind | 'area'
+
 const DEFAULT_OPEN_SIDEBAR_SECTIONS: Record<SidebarSectionKey, boolean> = {
   search: false,
   camera: true, // the one section open by default — everything else is a specialized tool, camera is the one you always need
@@ -69,6 +72,17 @@ interface EditorStore {
   /** Which Sidebar sections are expanded — not persisted, resets to DEFAULT_OPEN_SIDEBAR_SECTIONS on reload. */
   openSidebarSections: Record<SidebarSectionKey, boolean>
   setSidebarSectionOpen: (key: SidebarSectionKey, open: boolean) => void
+  /**
+   * Set by double-clicking a map point/area/route-leg (see pointDoubleClick.ts)
+   * — the matching field in the matching panel focuses itself and selects its
+   * current text, then clears this back to null itself (a one-shot signal,
+   * not a persistent "this field is focused" state). `field` distinguishes a
+   * route waypoint hit (undefined -> hold time) from a route LEG hit
+   * ('travelSec' -> the arriving waypoint's travel time); unused by the other
+   * kinds, which each have only one field to jump to.
+   */
+  focusFieldRequest: { kind: EditableKind; id: string; field?: 'travelSec' } | null
+  setFocusFieldRequest: (request: EditorStore['focusFieldRequest']) => void
   /** Window-layout preference (not project content) — persisted separately, see layoutPersist.ts. */
   sidebarWidthPx: number
   setSidebarWidthPx: (px: number) => void
@@ -100,6 +114,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setDragPreview: (preview) => set({ dragPreview: preview }),
   openSidebarSections: DEFAULT_OPEN_SIDEBAR_SECTIONS,
   setSidebarSectionOpen: (key, open) => set((state) => ({ openSidebarSections: { ...state.openSidebarSections, [key]: open } })),
+  focusFieldRequest: null,
+  setFocusFieldRequest: (request) => set({ focusFieldRequest: request }),
   sidebarWidthPx: initialLayout.sidebarWidthPx,
   setSidebarWidthPx: (px) => {
     const sidebarWidthPx = Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, px))

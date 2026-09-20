@@ -21,6 +21,19 @@ export function CameraPanel() {
     cardRefs.current.get(selectedObjectId)?.scrollIntoView({ block: 'nearest' })
   }, [selectedObjectId])
 
+  // Double-clicking a camera waypoint on the map jumps straight into its zoom field, text
+  // pre-selected — see pointDoubleClick.ts. One-shot: self-clears once handled.
+  const focusFieldRequest = useEditorStore((s) => s.focusFieldRequest)
+  const zoomFieldRefs = useRef<Map<string, HTMLInputElement>>(new Map())
+  useEffect(() => {
+    if (focusFieldRequest?.kind !== 'camera') return
+    const el = zoomFieldRefs.current.get(focusFieldRequest.id)
+    if (!el) return
+    el.focus()
+    el.select()
+    useEditorStore.getState().setFocusFieldRequest(null)
+  }, [focusFieldRequest])
+
   function updateWaypoint(id: string, fn: (wp: CameraWaypoint) => CameraWaypoint) {
     setProject((p) => ({
       ...p,
@@ -120,7 +133,25 @@ export function CameraPanel() {
               </div>
             </div>
 
-            <div className={styles.coords}>{describePoint(wp.lng, wp.lat, wp.zr)}</div>
+            <div className={styles.coords}>{describePoint(wp.lng, wp.lat)}</div>
+
+            <div>
+              <label className={styles.label} htmlFor={`camZoom-${wp.id}`}>
+                {t.zoom}
+              </label>
+              <input
+                id={`camZoom-${wp.id}`}
+                ref={(el) => {
+                  if (el) zoomFieldRefs.current.set(wp.id, el)
+                  else zoomFieldRefs.current.delete(wp.id)
+                }}
+                type="number"
+                className={styles.input}
+                step={0.1}
+                value={wp.zr}
+                onChange={(e) => updateWaypoint(wp.id, (w) => ({ ...w, zr: Number(e.target.value) }))}
+              />
+            </div>
 
             <div className={styles.btns}>
               <button type="button" className={styles.button} onClick={() => captureCurrentView(wp.id)}>
