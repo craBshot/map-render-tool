@@ -422,6 +422,45 @@ test('route: a third and fourth click insert before the destination, which stays
   expect(afterFourth[3]).toEqual(destination) // destination is still last
 })
 
+test('route: deleting a waypoint does not crash the app (regression: stale on-map positions array indexed out of bounds)', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (err) => errors.push(err.message))
+
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 150, y: 120 } })
+  await canvas.click({ button: 'right', position: { x: 250, y: 160 } })
+  await canvas.click({ button: 'right', position: { x: 200, y: 200 } })
+  await expect.poll(() => getRouteWaypoints(page)).toHaveLength(3)
+
+  const routeSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Route$/ }) })
+  await routeSection.getByRole('button', { name: '✕' }).first().click()
+
+  await expect.poll(() => getRouteWaypoints(page)).toHaveLength(2)
+  expect(errors).toEqual([])
+  // The app must still be alive and interactive, not a blank/crashed page.
+  await expect(canvas).toBeVisible()
+  await expect(routeSection).toBeVisible()
+})
+
+test('camera: deleting a waypoint does not crash the app (same class of bug as the route one above)', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (err) => errors.push(err.message))
+
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 350, y: 200 } })
+  await expect.poll(() => getCameraWaypoints(page)).toHaveLength(3)
+
+  await page.locator('[data-testid="camera-waypoint-2"]').getByRole('button', { name: '✕' }).click()
+
+  await expect.poll(() => getCameraWaypoints(page)).toHaveLength(2)
+  expect(errors).toEqual([])
+  await expect(canvas).toBeVisible()
+})
+
 test('route: dragging a segment boundary on the Timeline changes that leg\'s travelSec', async ({ page }) => {
   await gotoApp(page)
 

@@ -7,6 +7,11 @@ import styles from './RouteWaypointMarkers.module.css'
 interface Position {
   x: number
   y: number
+  /** Captured alongside x/y in the same update() pass as the waypoint it came from — never
+      re-derived by indexing into the live route.waypoints at render time, which (being a plain
+      prop, not state) can already be a different length than this still-stale-for-one-frame
+      positions array right after a waypoint is deleted, and index out of bounds. */
+  holdSec: number
 }
 
 /**
@@ -38,7 +43,8 @@ export function RouteWaypointMarkers() {
       setPositions(
         route.waypoints.map((w) => {
           const live = dragPreview?.kind === 'route' && dragPreview.id === w.id ? dragPreview : w
-          return controller.map.project([live.lng, live.lat])
+          const { x, y } = controller.map.project([live.lng, live.lat])
+          return { x, y, holdSec: w.holdSec }
         }),
       )
     }
@@ -59,7 +65,7 @@ export function RouteWaypointMarkers() {
         <div key={index} className={styles.waypoint} style={{ left: pos.x, top: pos.y }}>
           <span className={styles.dot} />
           <span className={styles.label} data-testid={`route-waypoint-label-${index}`}>
-            {mode === 'route' ? `${waypointLetter(index)} · ${fmtNum(route!.waypoints[index].holdSec, 1)}s` : waypointLetter(index)}
+            {mode === 'route' ? `${waypointLetter(index)} · ${fmtNum(pos.holdSec, 1)}s` : waypointLetter(index)}
           </span>
         </div>
       ))}

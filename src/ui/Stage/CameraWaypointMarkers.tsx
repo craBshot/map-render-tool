@@ -7,6 +7,12 @@ import styles from './CameraWaypointMarkers.module.css'
 interface Position {
   x: number
   y: number
+  /** Captured alongside x/y in the same update() pass as the waypoint it came from — never
+      re-derived by indexing into the live waypoints array at render time, which (being a plain
+      prop, not state) can already be a different length than this still-stale-for-one-frame
+      positions array right after a waypoint is deleted, and index out of bounds. */
+  zr: number
+  holdSec: number
 }
 
 /**
@@ -41,7 +47,8 @@ export function CameraWaypointMarkers() {
       setPositions(
         waypoints.map((w) => {
           const live = dragPreview?.kind === 'camera' && dragPreview.id === w.id ? dragPreview : w
-          return controller.map.project([live.lng, live.lat])
+          const { x, y } = controller.map.project([live.lng, live.lat])
+          return { x, y, zr: w.zr, holdSec: w.holdSec }
         }),
       )
     }
@@ -62,9 +69,7 @@ export function CameraWaypointMarkers() {
         <div key={index} className={styles.waypoint} style={{ left: pos.x, top: pos.y }}>
           <span className={styles.dot} />
           <span className={styles.label} data-testid={`camera-waypoint-label-${index}`}>
-            {mode === 'camera'
-              ? `${waypointLetter(index)} · Zoom ${fmtNum(waypoints[index].zr, 1)} · ${fmtNum(waypoints[index].holdSec, 1)}s`
-              : waypointLetter(index)}
+            {mode === 'camera' ? `${waypointLetter(index)} · Zoom ${fmtNum(pos.zr, 1)} · ${fmtNum(pos.holdSec, 1)}s` : waypointLetter(index)}
           </span>
         </div>
       ))}
