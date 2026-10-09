@@ -1,4 +1,4 @@
-import maplibregl from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
 import { easeInOutCubic } from '../timeline/ease'
 import { chainSegments, chainTotalSec, type ChainSegment } from '../timeline/waypointChain'
 import type { CameraPoint, CameraState, CameraWaypoint } from '../state/types'
