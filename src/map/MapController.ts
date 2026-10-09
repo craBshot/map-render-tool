@@ -1,4 +1,5 @@
-import maplibregl from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import type { AreaFrame } from './areaAnimation'
 import type { CameraFrame } from './camera'
 import { applyLabelSettings, captureOriginalLayers, type OriginalLayerInfo } from './labels'
@@ -6,6 +7,10 @@ import type { MarkerFrame } from './markerAnimation'
 import { sliceLineByFraction } from './routeGeometry'
 import type { RouteFrame } from './routeAnimation'
 import type { AreaObject, AreaStyle, MarkerObject, RouteObject, StyleId, StyleState } from '../state/types'
+
+// MapLibre resolves its worker file relative to its own module URL, which
+// doesn't survive Vite bundling — ship the worker as an asset and point at it.
+maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
 export const STYLE_URLS: Record<StyleId, string> = {
   positron: 'https://tiles.openfreemap.org/styles/positron',
@@ -70,7 +75,7 @@ export class MapController {
       center: [0, 0],
       zoom: 0,
       // Required so the export canvas can read back WebGL pixels.
-      preserveDrawingBuffer: true,
+      canvasContextAttributes: { preserveDrawingBuffer: true },
       // Otherwise labels are half-faded in captured frames.
       fadeDuration: 0,
       attributionControl: false,

@@ -3,11 +3,13 @@ import type { StyleState } from '../state/types'
 
 const MINOR_LAYERS = ['transportation_name', 'poi', 'aerodrome_label', 'mountain_peak', 'housenumber']
 
-const DE_FIELD = ['coalesce', ['get', 'name:de'], ['get', 'name:latin'], ['get', 'name']]
+const DE_FIELD: SymbolLayout['text-field'] = ['coalesce', ['get', 'name:de'], ['get', 'name:latin'], ['get', 'name']]
+
+type SymbolLayout = NonNullable<Extract<LayerSpecification, { type: 'symbol' }>['layout']>
 
 export interface OriginalLayerInfo {
-  visibility: string
-  textField: unknown
+  visibility: NonNullable<SymbolLayout['visibility']>
+  textField: SymbolLayout['text-field']
 }
 
 /** Category rank used for the label-density slider: lower shows first. */
