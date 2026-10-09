@@ -21,7 +21,7 @@ Browser tool that renders animated map flights (zoom from country to region, tar
 - **Stack:** Vite + React + TypeScript. Keep UI components small; do not bury map logic inside components.
 - **Architecture:** One serializable project state (JSON: camera start/end, objects, style, timing, export settings) is the single source of truth. Rendering a frame is a pure function of state + time. Preview and export use the same function.
 - **Folders:** `src/map/` (MapLibre, layers, camera), `src/timeline/` (timing, animations), `src/export/` (MP4, image sequence), `src/state/` (project state, save/load, migrations), `src/ui/` (components), `src/i18n/` (UI strings), `worker/` (area-db background service — see Tech).
-- **MapLibre GL JS 4.7.1** (intentionally pinned). v5 changes e.g. `preserveDrawingBuffer` → `canvasContextAttributes`. Upgrade only as a dedicated task.
+- **MapLibre GL JS 6.x.** Worker is shipped as a Vite `?url` asset + `setWorkerUrl()` (MapController.ts); nginx must serve `.mjs` as JavaScript. e2e tests use a tile-less mock style and do not exercise the worker.
 - **Map data:** OpenFreeMap styles (positron, liberty, bright, dark, fiord), no key.
 - **Place search:** Nominatim. Respect the usage policy: max 1 request/s, no search-as-you-type.
 - **Area lookup:** local-first, live-Overpass fallback.

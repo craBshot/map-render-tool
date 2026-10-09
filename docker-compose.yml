@@ -1,3 +1,7 @@
+# Fixed project name: keeps the area-db volume name stable no matter which
+# folder the repo is cloned into.
+name: map-render-tool
+
 services:
   map-render-tool:
     build:
