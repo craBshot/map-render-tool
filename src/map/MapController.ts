@@ -193,20 +193,20 @@ export class MapController {
    * Applies a precomputed camera + marker + area + route frame together —
    * the one path playback and export both go through. Free editing (camera
    * driven by the user's own pan/zoom) calls applyCameraFrame()/
-   * renderMarkers()/renderAreas()/renderRoute() separately instead, so
-   * editing an object doesn't snap the camera back. Areas render before the
-   * route, which renders before markers, so the target marker is never
+   * renderMarkers()/renderAreas()/renderRoutes() separately instead, so
+   * editing an object doesn't snap the camera back. Areas render before
+   * routes, which render before markers, so the target marker is never
    * obscured.
    */
   applyFrame(
     cameraFrame: CameraFrame,
     markers: RenderedMarker[],
     areas: RenderedArea[] = [],
-    route: RenderedRoute | null = null,
+    routes: RenderedRoute[] = [],
   ): void {
     this.applyCameraFrame(cameraFrame)
     this.renderAreas(areas)
-    this.renderRoute(route)
+    this.renderRoutes(routes)
     this.renderMarkers(markers)
   }
 
@@ -309,13 +309,34 @@ export class MapController {
     this.map.setPaintProperty(lineLayerId, 'line-dasharray', style.outline.dashed ? [2, 2] : undefined)
   }
 
-  /** Route line — one per project (v1). Inserted below markers, above areas (renderAreas/renderRoute/renderMarkers order). */
-  renderRoute(rendered: RenderedRoute | null): void {
-    if (!this.styleReady) return
-    const sourceId = 'route-line'
-    const lineLayerId = `${sourceId}-layer`
+  /** Route lines, one per route; list order = stacking order. Inserted below markers, above areas (renderAreas/renderRoutes/renderMarkers order). */
+  renderRoutes(routes: RenderedRoute[]): void {
+    this.removeStaleRouteLayers(routes)
+    for (const rendered of routes) this.renderRoute(rendered)
+  }
 
-    const visible = !!rendered && rendered.frame.visible && rendered.route.geometry !== null
+  /** Removes the source+layer of any route no longer in the list — same gap as removeStaleMarkerLayers. */
+  private removeStaleRouteLayers(routes: RenderedRoute[]): void {
+    if (!this.styleReady) return
+    const currentIds = new Set(routes.map(({ route }) => `route-${route.id}`))
+    const style = this.map.getStyle()
+    if (!style) return
+    for (const layer of style.layers) {
+      if (!layer.id.startsWith('route-')) continue
+      const sourceId = layer.id.replace(/-line$/, '')
+      if (sourceId !== layer.id && !currentIds.has(sourceId)) this.map.removeLayer(layer.id)
+    }
+    for (const sourceId of Object.keys(style.sources ?? {})) {
+      if (sourceId.startsWith('route-') && !currentIds.has(sourceId)) this.map.removeSource(sourceId)
+    }
+  }
+
+  private renderRoute({ route, frame }: RenderedRoute): void {
+    if (!this.styleReady) return
+    const sourceId = `route-${route.id}`
+    const lineLayerId = `${sourceId}-line`
+
+    const visible = frame.visible && route.geometry !== null
     const source = this.map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined
 
     if (!visible) {
@@ -323,8 +344,7 @@ export class MapController {
       return
     }
 
-    const route = rendered.route
-    const coordinates = sliceLineByFraction(route.geometry!.coordinates, rendered.frame.fraction)
+    const coordinates = sliceLineByFraction(route.geometry!.coordinates, frame.fraction)
     const data = { type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates } }
 
     if (!source) {

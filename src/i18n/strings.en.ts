@@ -133,7 +133,8 @@ export const en: typeof de = {
   },
   route: {
     heading: 'Route',
-    pickHint: 'Right-click in route mode appends a waypoint — the first click is the start, the second is the destination, every further click inserts a via-point just before it.',
+    pickHint: 'Right-click in route mode appends a waypoint to the highlighted route — the first click is the start, the second is the destination, every further click inserts a via-point just before it. Click a route to highlight it.',
+    newRoute: 'New route',
     waypointStart: 'Start',
     waypointDestination: 'Destination',
     waypointVia: (n: number) => `Via ${n}`,

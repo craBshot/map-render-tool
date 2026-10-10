@@ -12,7 +12,7 @@ Browser tool for animated map flights — zoom from country to region, highlight
 - **Camera flight** across any number of waypoints, with zoom, hold and travel times
 - **Markers** with name labels and a pulse effect
 - **Areas** (administrative boundaries, national parks, nature reserves) from OpenStreetMap, picked with a right-click
-- **Routes** via street routing (OSRM) or straight lines, drawn progressively
+- **Routes**, as many as needed, each via street routing (OSRM) or straight lines in its own color — drawn progressively, chainable end to end
 - **Timeline** to set when each object appears
 - **Deterministic export:** every frame is rendered from the project state, so the video matches the preview exactly — MP4 (H.264, WebCodecs) or PNG/JPEG sequence; landscape, portrait and square formats up to 4K, 24–60 fps
 - **Local area database:** a background worker slowly builds a local copy of area boundaries, so lookups don't depend on the public Overpass API being available

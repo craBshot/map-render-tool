@@ -5,9 +5,10 @@ import { markerStateAt } from '../../map/markerAnimation'
 import { routeStateAt } from '../../map/routeAnimation'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
-import { resolveAreaStyle, type AppearTiming, type AreaObject, type AreaStyle } from '../../state/types'
+import { resolveAreaStyle, resolveSelectedRoute, type AppearTiming, type AreaObject, type AreaStyle } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
 import { strings } from '../../i18n'
+import { routeLabel } from '../format'
 import { TimelineCameraRow } from './TimelineCameraRow'
 import { TimelineObjectRow } from './TimelineObjectRow'
 import { TimelineRouteRow } from './TimelineRouteRow'
@@ -74,19 +75,13 @@ export function Timeline() {
   }
 
   function updateRouteWaypointTiming(waypointId: string, kind: 'hold' | 'travel', valueSec: number) {
-    setProject((p) =>
-      p.route
-        ? {
-            ...p,
-            route: {
-              ...p.route,
-              waypoints: p.route.waypoints.map((w) =>
-                w.id === waypointId ? { ...w, [kind === 'hold' ? 'holdSec' : 'travelSec']: valueSec } : w,
-              ),
-            },
-          }
-        : p,
-    )
+    setProject((p) => ({
+      ...p,
+      routes: p.routes.map((r) => ({
+        ...r,
+        waypoints: r.waypoints.map((w) => (w.id === waypointId ? { ...w, [kind === 'hold' ? 'holdSec' : 'travelSec']: valueSec } : w)),
+      })),
+    }))
   }
 
   /** floor matches CameraPanel.tsx's own number-field clamps — Math.max(0, ...) for holdSec, Math.max(MIN_TRAVEL_SEC, ...) for travelSec. */
@@ -104,8 +99,11 @@ export function Timeline() {
   }
 
   /** floor matches RoutePanel.tsx's "Zeitpunkt (s)" field (Math.max(0, ...)). */
-  function updateRouteAppearStart(valueSec: number) {
-    setProject((p) => (p.route ? { ...p, route: { ...p.route, appear: { startSec: Math.max(0, valueSec) } } } : p))
+  function updateRouteAppearStart(routeId: string, valueSec: number) {
+    setProject((p) => ({
+      ...p,
+      routes: p.routes.map((r) => (r.id === routeId ? { ...r, appear: { startSec: Math.max(0, valueSec) } } : r)),
+    }))
   }
 
   useEffect(() => () => stop(), [])
@@ -122,7 +120,7 @@ export function Timeline() {
         const style = resolveAreaStyle(area.styleId, p.areaStyles)
         return { area, style, frame: areaStateAt(area, timingCtx, sec) }
       }),
-      p.route ? { route: p.route, frame: routeStateAt(p.route, sec) } : null,
+      p.routes.map((route) => ({ route, frame: routeStateAt(route, sec) })),
     )
   }
 
@@ -143,7 +141,7 @@ export function Timeline() {
         return { area, style, frame: areaStateAt(area, timingCtx, null) }
       }),
     )
-    controller.renderRoute(p.route ? { route: p.route, frame: routeStateAt(p.route, null) } : null)
+    controller.renderRoutes(p.routes.map((route) => ({ route, frame: routeStateAt(route, null) })))
   }
 
   function play() {
@@ -228,14 +226,18 @@ export function Timeline() {
             onResizeField={updateAreaAppearField}
           />
         ))}
-        {project.route && (
+        {project.routes.map((route, index) => (
           <TimelineRouteRow
-            route={project.route}
+            key={route.id}
+            route={route}
+            label={routeLabel(index, project.routes.length)}
             ctx={ctx}
+            selected={resolveSelectedRoute(project.routes, selectedObjectId)?.id === route.id}
+            onSelect={selectObject}
             onResizeSegment={updateRouteWaypointTiming}
             onResizeAppearStart={updateRouteAppearStart}
           />
-        )}
+        ))}
       </div>
     </div>
   )

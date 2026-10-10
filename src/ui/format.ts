@@ -1,3 +1,10 @@
+import { strings } from '../i18n'
+
+/** "Route" while there's only one, "Route 1", "Route 2" … once there are several. */
+export function routeLabel(index: number, count: number): string {
+  return count > 1 ? `${strings.timeline.routeRow} ${index + 1}` : strings.timeline.routeRow
+}
+
 export function fmtNum(n: number, decimals: number): string {
   return n.toFixed(decimals).replace('.', ',')
 }

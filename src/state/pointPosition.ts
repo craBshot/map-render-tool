@@ -29,8 +29,14 @@ export function withCameraWaypointPosition(project: ProjectFile, id: string, lng
  * a drag never fires an OSRM request (fair-use constraint, see CLAUDE.md).
  */
 export function withRouteWaypointPosition(project: ProjectFile, id: string, lng: number, lat: number): ProjectFile {
-  if (!project.route) return project
-  const waypoints = project.route.waypoints.map((w) => (w.id === id ? { ...w, lng, lat } : w))
-  const geometry = project.route.routingMode === 'straight' ? waypointsToStraightLine(waypoints) : project.route.geometry
-  return { ...project, route: { ...project.route, waypoints, geometry, legDistancesM: null } }
+  if (!project.routes.some((route) => route.waypoints.some((w) => w.id === id))) return project
+  return {
+    ...project,
+    routes: project.routes.map((route) => {
+      if (!route.waypoints.some((w) => w.id === id)) return route
+      const waypoints = route.waypoints.map((w) => (w.id === id ? { ...w, lng, lat } : w))
+      const geometry = route.routingMode === 'straight' ? waypointsToStraightLine(waypoints) : route.geometry
+      return { ...route, waypoints, geometry, legDistancesM: null }
+    }),
+  }
 }

@@ -1,4 +1,4 @@
-export const PROJECT_VERSION = 7
+export const PROJECT_VERSION = 8
 
 /**
  * crypto.randomUUID() requires a secure context, but this app must also
@@ -114,6 +114,16 @@ export function resolveAreaStyle(styleId: string | null, styles: AreaStyle[]): A
 
 export type RoutingMode = 'osrm' | 'straight'
 
+/** The selected route, if the selection is a route or one of its waypoints. */
+export function resolveSelectedRoute(routes: RouteObject[], selectedObjectId: string | null): RouteObject | null {
+  return routes.find((r) => r.id === selectedObjectId || r.waypoints.some((w) => w.id === selectedObjectId)) ?? null
+}
+
+/** The route that Route-mode right-clicks extend: the selected one, else the last one, else none. */
+export function resolveActiveRoute(routes: RouteObject[], selectedObjectId: string | null): RouteObject | null {
+  return resolveSelectedRoute(routes, selectedObjectId) ?? routes.at(-1) ?? null
+}
+
 export interface RouteWaypoint {
   id: string
   lng: number
@@ -173,7 +183,7 @@ export interface ProjectFile {
   areas: AreaObject[]
   areaStyles: AreaStyle[]
   // Single route for v1 — additive to widen into a list later, same as markers.
-  route: RouteObject | null
+  routes: RouteObject[]
   export: ExportSettings
 }
 
@@ -302,7 +312,7 @@ export function createDefaultProject(): ProjectFile {
     markers: [],
     areas: [],
     areaStyles: createDefaultAreaStyles(),
-    route: null,
+    routes: [],
     export: {
       resolution: { preset: '1920x1080', width: 1920, height: 1080 },
       fps: 30,

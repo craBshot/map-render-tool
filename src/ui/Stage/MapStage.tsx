@@ -17,6 +17,7 @@ import {
   createDefaultMarker,
   createDefaultRoute,
   createDefaultRouteWaypoint,
+  resolveActiveRoute,
   resolveAreaStyle,
 } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
@@ -79,7 +80,7 @@ export function MapStage() {
             frame: areaStateAt(area, timingCtx, null),
           })),
         )
-        controller.renderRoute(current.route ? { route: current.route, frame: routeStateAt(current.route, null) } : null)
+        controller.renderRoutes(current.routes.map((route) => ({ route, frame: routeStateAt(route, null) })))
         controller.renderMarkers(
           current.markers.map((marker) => ({ marker, frame: markerStateAt(marker, timingCtx, null) })),
         )
@@ -107,7 +108,9 @@ export function MapStage() {
       // Snap a new point onto an existing point of a DIFFERENT type, if one is close by —
       // never onto one of the same type (see pointHitTest.ts's findSnapTarget).
       const kind = kindForInteractionMode(mode)
-      const snap = kind ? findSnapTarget(kind, useProjectStore.getState().project, controller.map, e.lngLat) : null
+      const project = useProjectStore.getState().project
+      const activeRoute = mode === 'route' ? resolveActiveRoute(project.routes, useEditorStore.getState().selectedObjectId) : null
+      const snap = kind ? findSnapTarget({ kind, ownerId: activeRoute?.id }, project, controller.map, e.lngLat) : null
       const { lng, lat } = snap ?? e.lngLat
 
       if (mode === 'area') {
@@ -116,14 +119,22 @@ export function MapStage() {
       }
 
       if (mode === 'route') {
-        useProjectStore.getState().setProject((p) => {
-          const waypoints = insertRouteWaypoint(p.route?.waypoints ?? [], createDefaultRouteWaypoint(lng, lat))
-          const route = p.route ? { ...p.route, waypoints, legDistancesM: null } : createDefaultRoute(waypoints)
-          return {
-            ...p,
-            route: route.routingMode === 'straight' ? { ...route, geometry: waypointsToStraightLine(waypoints) } : route,
-          }
-        })
+        const waypoint = createDefaultRouteWaypoint(lng, lat)
+        if (!activeRoute) {
+          const route = createDefaultRoute([waypoint])
+          useProjectStore.getState().setProject((p) => ({ ...p, routes: [...p.routes, route] }))
+          useEditorStore.getState().setSelectedObjectId(route.id)
+          return
+        }
+        useProjectStore.getState().setProject((p) => ({
+          ...p,
+          routes: p.routes.map((r) => {
+            if (r.id !== activeRoute.id) return r
+            const waypoints = insertRouteWaypoint(r.waypoints, waypoint)
+            const geometry = r.routingMode === 'straight' ? waypointsToStraightLine(waypoints) : r.geometry
+            return { ...r, waypoints, geometry, legDistancesM: null }
+          }),
+        }))
         return
       }
 
@@ -227,8 +238,8 @@ export function MapStage() {
   useEffect(() => {
     const controller = controllerRef.current
     if (!controller) return
-    controller.renderRoute(project.route ? { route: project.route, frame: routeStateAt(project.route, null) } : null)
-  }, [project.route])
+    controller.renderRoutes(project.routes.map((route) => ({ route, frame: routeStateAt(route, null) })))
+  }, [project.routes])
 
   return (
     <div ref={stageRef} className={styles.stage}>

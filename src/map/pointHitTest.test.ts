@@ -11,13 +11,13 @@ function pt(kind: HitPoint['kind'], id: string, index: number, lng: number, lat:
 
 function project(overrides: Partial<ProjectFile> = {}): ProjectFile {
   return {
-    version: 7,
+    version: 8,
     camera: { waypoints: [] },
     style: { id: 'positron', labelDensity: 1, germanNames: true, hideMinorLabels: false },
     markers: [],
     areas: [],
     areaStyles: [],
-    route: null,
+    routes: [],
     export: { resolution: { preset: '1920x1080', width: 1920, height: 1080 }, fps: 30, format: 'mp4', quality: 1, showAttribution: true },
     ...overrides,
   }
@@ -58,7 +58,7 @@ describe('hitTestDraggable', () => {
   it('only returns points of the current mode\'s kind, even when a closer point of another kind exists', () => {
     const p = project({
       markers: [{ ...markerAt('m1', 0, 0) }],
-      route: routeWith([{ id: 'r1', lng: 5, lat: 0, holdSec: 0, travelSec: 0 }]),
+      routes: [routeWith([{ id: 'r1', lng: 5, lat: 0, holdSec: 0, travelSec: 0 }])],
     })
     // Pointer is right on the marker (0,0 -> px 0,0); the route waypoint is far away.
     expect(hitTestDraggable('route', p, projector, { x: 0, y: 0 }, 5))
@@ -76,7 +76,7 @@ describe('hitTestAnyKind', () => {
   it('finds the nearest point regardless of kind — not mode-scoped like hitTestDraggable', () => {
     const p = project({
       markers: [markerAt('m1', 0, 0)],
-      route: routeWith([{ id: 'r1', lng: 5, lat: 0, holdSec: 0, travelSec: 0 }]),
+      routes: [routeWith([{ id: 'r1', lng: 5, lat: 0, holdSec: 0, travelSec: 0 }])],
     })
     expect(hitTestAnyKind(p, projector, { x: 0, y: 0 }, 5)?.id).toBe('m1')
     expect(hitTestAnyKind(p, projector, { x: 50, y: 0 }, 5)?.id).toBe('r1')
@@ -94,14 +94,31 @@ describe('findSnapTarget', () => {
       markers: [markerAt('closeMarker', 1, 0), markerAt('otherMarker', 1, 0)],
       camera: { waypoints: [{ id: 'c1', lng: 1.01, lat: 0, zr: 5, holdSec: 1, travelSec: 0 }] },
     })
-    const target = findSnapTarget('marker', p, projector, { lng: 1, lat: 0 }, 50)
+    const target = findSnapTarget({ kind: 'marker' }, p, projector, { lng: 1, lat: 0 }, 50)
     expect(target?.kind).not.toBe('marker')
     expect(target?.id).toBe('c1')
   })
 
   it('returns null when the nearest other-type point is outside the radius', () => {
     const p = project({ camera: { waypoints: [{ id: 'c1', lng: 10, lat: 10, zr: 5, holdSec: 1, travelSec: 0 }] } })
-    expect(findSnapTarget('marker', p, projector, { lng: 0, lat: 0 }, 5)).toBeNull()
+    expect(findSnapTarget({ kind: 'marker' }, p, projector, { lng: 0, lat: 0 }, 5)).toBeNull()
+  })
+
+  it("snaps a route point onto ANOTHER route's waypoint, never onto its own route's", () => {
+    const p = project({
+      routes: [
+        routeWith([{ id: 'own', lng: 1, lat: 0, holdSec: 0, travelSec: 0 }], 'routeA'),
+        routeWith([{ id: 'foreign', lng: 1.2, lat: 0, holdSec: 0, travelSec: 0 }], 'routeB'),
+      ],
+    })
+    // Own waypoint is closer (distance 0) but excluded — the other route's end point wins.
+    const target = findSnapTarget({ kind: 'route', ownerId: 'routeA' }, p, projector, { lng: 1, lat: 0 }, 50)
+    expect(target).toMatchObject({ kind: 'route', id: 'foreign', ownerId: 'routeB' })
+  })
+
+  it('a brand-new route (no owner yet) can snap onto any existing route waypoint', () => {
+    const p = project({ routes: [routeWith([{ id: 'w1', lng: 1, lat: 0, holdSec: 0, travelSec: 0 }], 'routeA')] })
+    expect(findSnapTarget({ kind: 'route' }, p, projector, { lng: 1, lat: 0 }, 50)?.id).toBe('w1')
   })
 })
 
@@ -118,9 +135,9 @@ function markerAt(id: string, lng: number, lat: number) {
   }
 }
 
-function routeWith(waypoints: { id: string; lng: number; lat: number; holdSec: number; travelSec: number }[]) {
+function routeWith(waypoints: { id: string; lng: number; lat: number; holdSec: number; travelSec: number }[], id = 'route1') {
   return {
-    id: 'route1',
+    id,
     waypoints,
     routingMode: 'straight' as const,
     geometry: null,
