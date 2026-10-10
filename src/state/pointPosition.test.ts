@@ -26,27 +26,29 @@ function baseProject(overrides: Partial<ProjectFile> = {}): ProjectFile {
     ],
     areas: [],
     areaStyles: [],
-    route: {
-      id: 'route1',
-      waypoints: [
-        { id: 'r1', lng: 0, lat: 0, holdSec: 0, travelSec: 0 },
-        { id: 'r2', lng: 1, lat: 1, holdSec: 0, travelSec: 3 },
-      ],
-      routingMode: 'straight',
-      geometry: {
-        type: 'LineString',
-        coordinates: [
-          [0, 0],
-          [1, 1],
+    routes: [
+      {
+        id: 'route1',
+        waypoints: [
+          { id: 'r1', lng: 0, lat: 0, holdSec: 0, travelSec: 0 },
+          { id: 'r2', lng: 1, lat: 1, holdSec: 0, travelSec: 3 },
         ],
+        routingMode: 'straight',
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [0, 0],
+            [1, 1],
+          ],
+        },
+        osrmDurationSec: null,
+        legDistancesM: [100],
+        color: '#e6572f',
+        widthPx: 4,
+        visible: true,
+        appear: { startSec: 0 },
       },
-      osrmDurationSec: null,
-      legDistancesM: [100],
-      color: '#e6572f',
-      widthPx: 4,
-      visible: true,
-      appear: { startSec: 0 },
-    },
+    ],
     export: { resolution: { preset: '1920x1080', width: 1920, height: 1080 }, fps: 30, format: 'mp4', quality: 1, showAttribution: true },
     ...overrides,
   }
@@ -70,28 +72,28 @@ describe('withCameraWaypointPosition', () => {
 describe('withRouteWaypointPosition', () => {
   it('straight mode: recomputes geometry and nulls legDistancesM', () => {
     const result = withRouteWaypointPosition(baseProject(), 'r2', 9, 9)
-    expect(result.route!.waypoints[1]).toMatchObject({ lng: 9, lat: 9 })
-    expect(result.route!.geometry).toEqual({
+    expect(result.routes[0].waypoints[1]).toMatchObject({ lng: 9, lat: 9 })
+    expect(result.routes[0].geometry).toEqual({
       type: 'LineString',
       coordinates: [
         [0, 0],
         [9, 9],
       ],
     })
-    expect(result.route!.legDistancesM).toBeNull()
+    expect(result.routes[0].legDistancesM).toBeNull()
   })
 
   it('osrm mode: leaves geometry stale (no OSRM request), still nulls legDistancesM', () => {
-    const p = baseProject({ route: { ...baseProject().route!, routingMode: 'osrm' } })
-    const staleGeometry = p.route!.geometry
+    const p = baseProject({ routes: [{ ...baseProject().routes[0], routingMode: 'osrm' }] })
+    const staleGeometry = p.routes[0].geometry
     const result = withRouteWaypointPosition(p, 'r2', 9, 9)
-    expect(result.route!.waypoints[1]).toMatchObject({ lng: 9, lat: 9 })
-    expect(result.route!.geometry).toBe(staleGeometry) // untouched, deliberately stale
-    expect(result.route!.legDistancesM).toBeNull()
+    expect(result.routes[0].waypoints[1]).toMatchObject({ lng: 9, lat: 9 })
+    expect(result.routes[0].geometry).toBe(staleGeometry) // untouched, deliberately stale
+    expect(result.routes[0].legDistancesM).toBeNull()
   })
 
   it('no-op when there is no route', () => {
-    const p = baseProject({ route: null })
+    const p = baseProject({ routes: [] })
     expect(withRouteWaypointPosition(p, 'r1', 9, 9)).toBe(p)
   })
 })

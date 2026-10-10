@@ -118,19 +118,17 @@ export async function runExport({ controller, project, onProgress, isCancelled }
         const style = resolveAreaStyle(area.styleId, project.areaStyles)
         return { area, style, frame: areaStateAt(area, timingCtx, sec) }
       })
-      const route: RenderedRoute | null = project.route
-        ? { route: project.route, frame: routeStateAt(project.route, sec) }
-        : null
+      const routes: RenderedRoute[] = project.routes.map((route) => ({ route, frame: routeStateAt(route, sec) }))
       // Keyed on the *computed* camera frame, not sec — sec increments every frame even during a
       // hold, but the camera frame (like marker/area/route frames) stays constant throughout one,
       // which is what lets held frames skip re-rendering below.
-      const key = `${JSON.stringify(cameraFrame)}|${JSON.stringify(markers.map((m) => m.frame))}|${JSON.stringify(areas.map((a) => a.frame))}|${JSON.stringify(route?.frame)}`
+      const key = `${JSON.stringify(cameraFrame)}|${JSON.stringify(markers.map((m) => m.frame))}|${JSON.stringify(areas.map((a) => a.frame))}|${JSON.stringify(routes.map((r) => r.frame))}`
       const changed = key !== lastKey
 
       if (changed) {
         controller.applyCameraFrame(cameraFrame)
         controller.renderAreas(areas)
-        controller.renderRoute(route)
+        controller.renderRoutes(routes)
         controller.renderMarkers(markers)
         if (!areasOrdered) {
           controller.reorderAreaLayers(project.areas.map((a) => a.id))

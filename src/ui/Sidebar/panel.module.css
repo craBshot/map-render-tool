@@ -219,3 +219,29 @@ details:not([open]) > .heading {
   align-items: center;
   gap: 2px;
 }
+
+/* One collapsible group per route in RoutePanel; the accent stripe marks the route that
+   Route-mode right-clicks currently extend (see resolveActiveRoute). */
+.routeGroup {
+  border-left: 3px solid var(--line);
+  padding-left: 10px;
+  margin: 0 0 14px;
+}
+.routeGroupActive {
+  border-left-color: var(--accent);
+}
+.routeSummary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+.routeSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: none;
+}

@@ -43,7 +43,7 @@ function project(overrides: Partial<ProjectFile> = {}): ProjectFile {
     markers: [],
     areas: [],
     areaStyles: [],
-    route: null,
+    routes: [],
     export: { resolution: { preset: '1920x1080', width: 1920, height: 1080 }, fps: 30, format: 'mp4', quality: 1, showAttribution: true },
     ...overrides,
   }

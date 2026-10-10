@@ -7,6 +7,8 @@ import styles from './RouteWaypointMarkers.module.css'
 interface Position {
   x: number
   y: number
+  routeIndex: number
+  index: number
   /** Captured alongside x/y in the same update() pass as the waypoint it came from — never
       re-derived by indexing into the live route.waypoints at render time, which (being a plain
       prop, not state) can already be a different length than this still-stale-for-one-frame
@@ -23,9 +25,10 @@ interface Position {
  *
  * While in Route mode, the label also shows the waypoint's hold time —
  * decluttered away in other modes, where it isn't the thing being edited.
+ * With more than one route, letters get the route's number as prefix (2A, 2B …).
  */
 export function RouteWaypointMarkers() {
-  const route = useProjectStore((s) => s.project.route)
+  const routes = useProjectStore((s) => s.project.routes)
   const controller = useEditorStore((s) => s.controller)
   const locked = useEditorStore((s) => s.locked)
   const playing = useEditorStore((s) => s.playing)
@@ -34,18 +37,20 @@ export function RouteWaypointMarkers() {
   const [positions, setPositions] = useState<Position[]>([])
 
   useEffect(() => {
-    if (!controller || !route) {
+    if (!controller) {
       setPositions([])
       return
     }
 
     const update = () => {
       setPositions(
-        route.waypoints.map((w) => {
-          const live = dragPreview?.kind === 'route' && dragPreview.id === w.id ? dragPreview : w
-          const { x, y } = controller.map.project([live.lng, live.lat])
-          return { x, y, holdSec: w.holdSec }
-        }),
+        routes.flatMap((route, routeIndex) =>
+          route.waypoints.map((w, index) => {
+            const live = dragPreview?.kind === 'route' && dragPreview.id === w.id ? dragPreview : w
+            const { x, y } = controller.map.project([live.lng, live.lat])
+            return { x, y, routeIndex, index, holdSec: w.holdSec }
+          }),
+        ),
       )
     }
     update()
@@ -55,20 +60,24 @@ export function RouteWaypointMarkers() {
       controller.map.off('move', update)
       controller.map.off('resize', update)
     }
-  }, [controller, route, dragPreview])
+  }, [controller, routes, dragPreview])
 
-  if (!route || locked || playing) return null
+  if (locked || playing) return null
 
+  const prefixed = routes.length > 1
   return (
     <>
-      {positions.map((pos, index) => (
-        <div key={index} className={styles.waypoint} style={{ left: pos.x, top: pos.y }}>
-          <span className={styles.dot} />
-          <span className={styles.label} data-testid={`route-waypoint-label-${index}`}>
-            {mode === 'route' ? `${waypointLetter(index)} · ${fmtNum(pos.holdSec, 1)}s` : waypointLetter(index)}
-          </span>
-        </div>
-      ))}
+      {positions.map((pos) => {
+        const letter = `${prefixed ? pos.routeIndex + 1 : ''}${waypointLetter(pos.index)}`
+        return (
+          <div key={`${pos.routeIndex}-${pos.index}`} className={styles.waypoint} style={{ left: pos.x, top: pos.y }}>
+            <span className={styles.dot} />
+            <span className={styles.label} data-testid={`route-waypoint-label-${pos.routeIndex}-${pos.index}`}>
+              {mode === 'route' ? `${letter} · ${fmtNum(pos.holdSec, 1)}s` : letter}
+            </span>
+          </div>
+        )
+      })}
     </>
   )
 }

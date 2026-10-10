@@ -1,5 +1,4 @@
 import { useRef } from 'react'
-import { strings } from '../../i18n'
 import type { RouteObject } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
 import { fmtNum, waypointLetter } from '../format'
@@ -10,9 +9,12 @@ import styles from './Timeline.module.css'
 
 export interface TimelineRouteRowProps {
   route: RouteObject
+  label: string
   ctx: TimingContext
+  selected: boolean
+  onSelect: (routeId: string) => void
   onResizeSegment: (waypointId: string, kind: 'hold' | 'travel', valueSec: number) => void
-  onResizeAppearStart: (valueSec: number) => void
+  onResizeAppearStart: (routeId: string, valueSec: number) => void
 }
 
 /** Minimum gap between two handles' render positions, as a percent of track width — see declutterHandlePositions. */
@@ -34,7 +36,7 @@ type RouteHandleKind = 'appear' | 'hold' | 'travel'
  * segment, so appear.startSec is draggable through the identical
  * mechanism instead of a separate "move the whole bar" primitive.
  */
-export function TimelineRouteRow({ route, ctx, onResizeSegment, onResizeAppearStart }: TimelineRouteRowProps) {
+export function TimelineRouteRow({ route, label, ctx, selected, onSelect, onResizeSegment, onResizeAppearStart }: TimelineRouteRowProps) {
   const segments = chainSegmentsLayout(route.waypoints, ctx, 0, route.appear.startSec)
   const color = route.color
   const trackRef = useRef<HTMLDivElement>(null)
@@ -67,15 +69,15 @@ export function TimelineRouteRow({ route, ctx, onResizeSegment, onResizeAppearSt
   const labels = declutterHandlePositions(labelSpecs, MIN_HANDLE_GAP_PCT)
 
   function handleResize(id: string, kind: RouteHandleKind, valueSec: number) {
-    if (kind === 'appear') onResizeAppearStart(valueSec)
+    if (kind === 'appear') onResizeAppearStart(route.id, valueSec)
     else onResizeSegment(id, kind, valueSec)
   }
 
   return (
-    <div className={styles.row}>
-      <div className={styles.rowLabel}>
+    <div className={`${styles.row} ${selected ? styles.rowSelected : ''}`}>
+      <div className={styles.rowLabel} onClick={() => onSelect(route.id)}>
         <span className={styles.swatch} style={{ background: color }} />
-        <span className={styles.rowLabelText}>{strings.timeline.routeRow}</span>
+        <span className={styles.rowLabelText}>{label}</span>
       </div>
       <div ref={trackRef} className={styles.rowTrack} data-testid="timeline-route-track">
         {segments.map((seg, i) => (

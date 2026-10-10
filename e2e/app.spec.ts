@@ -46,14 +46,14 @@ async function isAreaVisible(page: import('@playwright/test').Page): Promise<boo
   })
 }
 
-/** True if the route line layer exists and is not hidden. */
+/** True if at least one route line layer exists and is not hidden. */
 async function isRouteVisible(page: import('@playwright/test').Page): Promise<boolean> {
   return page.evaluate(() => {
     const controller = window.__mapController
     if (!controller) return false
-    const lineLayer = controller.map.getStyle().layers.find((l) => l.id === 'route-line-layer')
-    if (!lineLayer) return false
-    return controller.map.getLayoutProperty(lineLayer.id, 'visibility') !== 'none'
+    return controller.map
+      .getStyle()
+      .layers.some((l) => /^route-.+-line$/.test(l.id) && controller.map.getLayoutProperty(l.id, 'visibility') !== 'none')
   })
 }
 
@@ -64,7 +64,7 @@ async function getRouteWaypoints(
   return page.evaluate(() => {
     const raw = localStorage.getItem('map-render-tool:project')
     if (!raw) return []
-    return JSON.parse(raw).route?.waypoints ?? []
+    return JSON.parse(raw).routes[0]?.waypoints ?? []
   })
 }
 
@@ -84,7 +84,7 @@ async function getRouteAppearStartSec(page: import('@playwright/test').Page): Pr
   return page.evaluate(() => {
     const raw = localStorage.getItem('map-render-tool:project')
     if (!raw) return null
-    return JSON.parse(raw).route?.appear.startSec ?? null
+    return JSON.parse(raw).routes[0]?.appear.startSec ?? null
   })
 }
 
@@ -93,7 +93,7 @@ async function getRouteId(page: import('@playwright/test').Page): Promise<string
   return page.evaluate(() => {
     const raw = localStorage.getItem('map-render-tool:project')
     if (!raw) return null
-    return JSON.parse(raw).route?.id ?? null
+    return JSON.parse(raw).routes[0]?.id ?? null
   })
 }
 
@@ -115,7 +115,7 @@ async function getMarkers(
  * safe to call even when a section might already be expanded (e.g. by a prior action).
  */
 async function openSection(page: import('@playwright/test').Page, heading: string): Promise<void> {
-  const details = page.locator('details').filter({ has: page.locator('summary', { hasText: heading }) })
+  const details = page.locator('details[data-section]').filter({ has: page.locator('summary', { hasText: heading }) })
   const isOpen = await details.evaluate((el) => (el as HTMLDetailsElement).open)
   if (!isOpen) await details.locator('summary').click()
 }
@@ -377,6 +377,105 @@ test('camera: right-clicks in camera mode append waypoints, and playback actuall
   expect(zr).toBeLessThan(Math.max(start.zr, added.zr) + 0.5)
 })
 
+/** Number of route line layers currently visible on the map (one per route). */
+async function visibleRouteLineCount(page: import('@playwright/test').Page): Promise<number> {
+  return page.evaluate(() => {
+    const controller = window.__mapController
+    if (!controller) return 0
+    return controller.map
+      .getStyle()
+      .layers.filter((l) => /^route-.+-line$/.test(l.id) && controller.map.getLayoutProperty(l.id, 'visibility') !== 'none').length
+  })
+}
+
+test('routes: a second route (straight line, own color) snaps onto the first one\'s end, and both render, show up on the Timeline and export', async ({
+  page,
+}) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  const cards = page.locator('[data-testid^="route-card-"]')
+
+  // Route 1: street routing (OSRM mocked).
+  await canvas.click({ button: 'right', position: { x: 150, y: 120 } })
+  await canvas.click({ button: 'right', position: { x: 250, y: 130 } })
+  await cards.nth(0).getByRole('button', { name: 'Route berechnen' }).click()
+
+  // Route 2: starts a few px off route 1's end — must snap exactly onto it — then continues as a straight line.
+  await page.getByRole('button', { name: 'Neue Route' }).click()
+  await expect(cards).toHaveCount(2)
+  const route1End = (await getRouteWaypoints(page))[1]
+  const endPx = await page.evaluate(([lng, lat]) => window.__mapController!.map.project([lng, lat]), [route1End.lng, route1End.lat] as [number, number])
+  await canvas.click({ button: 'right', position: { x: endPx.x + 4, y: endPx.y + 3 } })
+  await canvas.click({ button: 'right', position: { x: 350, y: 200 } })
+  await cards.nth(1).getByRole('radio', { name: 'Luftlinie' }).click()
+  await cards.nth(1).locator('input[type="color"]').fill('#e6572f')
+
+  const routes = await page.evaluate(() => JSON.parse(localStorage.getItem('map-render-tool:project') ?? '{}').routes)
+  expect(routes).toHaveLength(2)
+  expect(routes[0].waypoints).toHaveLength(2) // right-clicks after "Neue Route" went to route 2, not route 1
+  expect(routes[1].waypoints).toHaveLength(2)
+  expect(routes[1].waypoints[0]).toMatchObject({ lng: routes[0].waypoints[1].lng, lat: routes[0].waypoints[1].lat })
+  expect(routes[0].routingMode).toBe('osrm')
+  expect(routes[1].routingMode).toBe('straight')
+  expect(routes[1].color).toBe('#e6572f')
+
+  await expect.poll(() => visibleRouteLineCount(page)).toBe(2)
+  await expect(page.locator('[data-testid="timeline-route-track"]')).toHaveCount(2)
+  await expect(page.locator('[data-testid="route-waypoint-label-1-0"]')).toContainText('2A')
+
+  // Both routes survive an export (every frame renders both route layers).
+  await openSection(page, 'Export')
+  await page.selectOption('#exportFps', '24')
+  const downloadPromise = page.waitForEvent('download', { timeout: 60_000 })
+  await page.getByRole('button', { name: 'Exportieren' }).click()
+  expect(await (await downloadPromise).path()).toBeTruthy()
+  await expect.poll(() => visibleRouteLineCount(page)).toBe(2)
+})
+
+test('routes: a project saved with the old single-route format (v7) still loads its route', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return
+    sessionStorage.setItem('seeded', '1')
+    localStorage.setItem(
+      'map-render-tool:project',
+      JSON.stringify({
+        version: 7,
+        camera: {
+          waypoints: [
+            { id: 'c1', lng: 10, lat: 51, zr: 4, holdSec: 1, travelSec: 0 },
+            { id: 'c2', lng: 10, lat: 51, zr: 6, holdSec: 1, travelSec: 2 },
+          ],
+        },
+        style: { id: 'positron', labelDensity: 1, germanNames: true, hideMinorLabels: true },
+        markers: [],
+        areas: [],
+        areaStyles: [],
+        route: {
+          id: 'legacy',
+          waypoints: [
+            { id: 'w1', lng: 9, lat: 50, holdSec: 0, travelSec: 0 },
+            { id: 'w2', lng: 11, lat: 52, holdSec: 0, travelSec: 2 },
+          ],
+          routingMode: 'straight',
+          geometry: { type: 'LineString', coordinates: [[9, 50], [11, 52]] },
+          osrmDurationSec: null,
+          legDistancesM: null,
+          color: '#2f6bff',
+          widthPx: 4,
+          visible: true,
+          appear: { startSec: 0 },
+        },
+        export: { resolution: { preset: '1920x1080', width: 1920, height: 1080 }, fps: 30, format: 'mp4', quality: 0.35, showAttribution: true },
+      }),
+    )
+  })
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  await expect.poll(() => visibleRouteLineCount(page)).toBe(1)
+  await expect(page.locator('[data-testid="route-card-legacy"]')).toHaveCount(1)
+})
+
 test('route: straight-line mode renders without ever calling OSRM', async ({ page }) => {
   const osrmRequests: string[] = []
   page.on('request', (req) => {
@@ -434,7 +533,7 @@ test('route: deleting a waypoint does not crash the app (regression: stale on-ma
   await canvas.click({ button: 'right', position: { x: 200, y: 200 } })
   await expect.poll(() => getRouteWaypoints(page)).toHaveLength(3)
 
-  const routeSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Route$/ }) })
+  const routeSection = page.locator('details[data-section="route"]')
   await routeSection.getByRole('button', { name: '✕' }).first().click()
 
   await expect.poll(() => getRouteWaypoints(page)).toHaveLength(2)

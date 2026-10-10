@@ -30,7 +30,7 @@ async function getRouteWaypoints(page: import('@playwright/test').Page): Promise
   return page.evaluate(() => {
     const raw = localStorage.getItem('map-render-tool:project')
     if (!raw) return []
-    return JSON.parse(raw).route?.waypoints ?? []
+    return JSON.parse(raw).routes[0]?.waypoints ?? []
   })
 }
 
@@ -38,9 +38,9 @@ async function isRouteVisible(page: import('@playwright/test').Page): Promise<bo
   return page.evaluate(() => {
     const controller = window.__mapController
     if (!controller) return false
-    const lineLayer = controller.map.getStyle().layers.find((l) => l.id === 'route-line-layer')
-    if (!lineLayer) return false
-    return controller.map.getLayoutProperty(lineLayer.id, 'visibility') !== 'none'
+    return controller.map
+      .getStyle()
+      .layers.some((l) => /^route-.+-line$/.test(l.id) && controller.map.getLayoutProperty(l.id, 'visibility') !== 'none')
   })
 }
 
@@ -90,7 +90,7 @@ async function pagePointFor(page: import('@playwright/test').Page, lng: number, 
 
 /** Expands a Sidebar section by its heading text — every section but "Kamerafahrt" is collapsed by default. Idempotent. */
 async function openSection(page: import('@playwright/test').Page, heading: string): Promise<void> {
-  const details = page.locator('details').filter({ has: page.locator('summary', { hasText: heading }) })
+  const details = page.locator('details[data-section]').filter({ has: page.locator('summary', { hasText: heading }) })
   const isOpen = await details.evaluate((el) => (el as HTMLDetailsElement).open)
   if (!isOpen) await details.locator('summary').click()
 }
@@ -282,7 +282,7 @@ test('double-clicking a route waypoint selects it (its section is already open b
   const at = await pagePointFor(page, wp.lng, wp.lat)
   await page.mouse.dblclick(at.x, at.y)
 
-  const routeSection = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Route$/ }) })
+  const routeSection = page.locator('details[data-section="route"]')
   await expect(routeSection).toHaveJSProperty('open', true)
   const card = page.locator('[data-testid="route-waypoint-0"]')
   await expect(async () => {
@@ -430,7 +430,7 @@ test('route waypoint labels on the map show hold time only while in Route planen
   await page.getByRole('radio', { name: 'Route planen' }).click()
   await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
 
-  const label = page.locator('[data-testid="route-waypoint-label-0"]')
+  const label = page.locator('[data-testid="route-waypoint-label-0-0"]')
   await expect(label).toContainText('s') // "A · 1,0s" while still in Route mode
 
   await page.getByRole('radio', { name: 'Marker setzen' }).click()

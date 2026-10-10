@@ -23,6 +23,7 @@ export function CollapsibleSection({
   return (
     <details
       className={styles.section}
+      data-section={sectionKey}
       open={open}
       onToggle={(e) => useEditorStore.getState().setSidebarSectionOpen(sectionKey, e.currentTarget.open)}
     >

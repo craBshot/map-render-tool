@@ -24,7 +24,7 @@ export function attachPointDragHandler(controller: MapController): () => void {
 
   function resolveFinalPosition(hit: HitPoint, e: MapMouseEvent): { lng: number; lat: number; snapped: boolean } {
     const project = useProjectStore.getState().project
-    const target = findSnapTarget(hit.kind, project, map, e.lngLat)
+    const target = findSnapTarget(hit, project, map, e.lngLat)
     return target ? { lng: target.lng, lat: target.lat, snapped: true } : { lng: e.lngLat.lng, lat: e.lngLat.lat, snapped: false }
   }
 

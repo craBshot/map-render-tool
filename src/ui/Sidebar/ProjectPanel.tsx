@@ -13,7 +13,7 @@ export function ProjectPanel() {
   function resetProject() {
     if (!window.confirm(t.resetConfirm)) return
     const defaults = createDefaultProject()
-    setProject((p) => ({ ...p, camera: defaults.camera, markers: [], areas: [], route: null }))
+    setProject((p) => ({ ...p, camera: defaults.camera, markers: [], areas: [], routes: [] }))
     useEditorStore.getState().setSelectedObjectId(null)
     useEditorStore.getState().setPlaybackTimeSec(0)
   }

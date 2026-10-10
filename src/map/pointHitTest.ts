@@ -13,6 +13,8 @@ export interface HitPoint {
   index: number
   lng: number
   lat: number
+  /** The route a route waypoint belongs to (routes are a list, each with its own waypoints); unset for other kinds. */
+  ownerId?: string
 }
 
 const ALL_KINDS: DraggablePointKind[] = ['marker', 'route', 'camera']
@@ -27,7 +29,9 @@ export function collectPoints(kind: DraggablePointKind, project: ProjectFile): H
     return project.markers.map((m, index) => ({ kind, id: m.id, index, lng: m.lng, lat: m.lat }))
   }
   if (kind === 'route') {
-    return (project.route?.waypoints ?? []).map((w, index) => ({ kind, id: w.id, index, lng: w.lng, lat: w.lat }))
+    return project.routes.flatMap((route) =>
+      route.waypoints.map((w, index) => ({ kind, id: w.id, index, lng: w.lng, lat: w.lat, ownerId: route.id })),
+    )
   }
   return project.camera.waypoints.map((w, index) => ({ kind, id: w.id, index, lng: w.lng, lat: w.lat }))
 }
@@ -87,19 +91,22 @@ export function hitTestAnyKind(project: ProjectFile, projector: Projector, point
 }
 
 /**
- * The cross-type snap target for a point of activeKind being placed/dragged
- * at candidateLngLat — only ever looks at the OTHER two kinds, so a point
- * can never snap to one of its own type (the design's core invariant: same-
- * type points never stack, so there's nothing to pull apart later).
+ * The snap target for a point being placed/dragged at candidateLngLat. Looks at the
+ * OTHER kinds, plus the waypoints of OTHER routes — never at points of the same
+ * owner (same marker list, same camera flight, same route), so those never stack and
+ * there's nothing to pull apart later. Routes snapping onto each other is deliberate:
+ * it's how one route continues where another ends (e.g. street leg -> straight leg).
  */
 export function findSnapTarget(
-  activeKind: DraggablePointKind,
+  active: { kind: DraggablePointKind; ownerId?: string },
   project: ProjectFile,
   projector: Projector,
   candidateLngLat: { lng: number; lat: number },
   radiusPx: number = SNAP_RADIUS_PX,
 ): HitPoint | null {
-  const candidates = ALL_KINDS.filter((k) => k !== activeKind).flatMap((k) => collectPoints(k, project))
+  const candidates = ALL_KINDS.flatMap((k) => collectPoints(k, project)).filter((point) =>
+    point.kind === 'route' && active.kind === 'route' ? point.ownerId !== active.ownerId : point.kind !== active.kind,
+  )
   const pointerPx = projector.project([candidateLngLat.lng, candidateLngLat.lat])
   return pickNearest(projector, candidates, pointerPx, radiusPx)
 }

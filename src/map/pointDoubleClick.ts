@@ -54,9 +54,11 @@ export function attachDoubleClickEditHandler(controller: MapController): () => v
       return
     }
 
-    const legIndex = project.route ? hitTestRouteLeg(project.route, map, e.point) : null
-    if (legIndex !== null && project.route) {
-      const arriving = project.route.waypoints[legIndex + 1]
+    const legHit = project.routes
+      .map((route) => ({ route, legIndex: hitTestRouteLeg(route, map, e.point) }))
+      .findLast((hit) => hit.legIndex !== null) // topmost (last-drawn) route wins on overlap
+    if (legHit && legHit.legIndex !== null) {
+      const arriving = legHit.route.waypoints[legHit.legIndex + 1]
       e.preventDefault()
       editor.setPointInteractionMode('route')
       editor.setSidebarSectionOpen('route', true)

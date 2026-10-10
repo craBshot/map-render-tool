@@ -169,6 +169,12 @@ const migrations: Record<number, Migration> = {
     }
     return { ...(data as object), version: 7, route }
   },
+  // v7 -> v8: one route per project became a list (multiple routes, e.g. a street leg
+  // followed by a straight-line leg in another color). The old single route becomes routes[0].
+  7: (data) => {
+    const { route, ...rest } = data as { route: Record<string, unknown> | null }
+    return { ...rest, version: 8, routes: route ? [route] : [] }
+  },
 }
 
 export class UnsupportedProjectVersionError extends Error {
