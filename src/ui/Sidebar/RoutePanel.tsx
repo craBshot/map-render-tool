@@ -163,7 +163,8 @@ function RouteCard({ route, label, active }: RouteCardProps) {
 
   return (
     <details
-      className={`${styles.routeGroup} ${active ? styles.routeGroupActive : ''}`}
+      className={styles.routeGroup}
+      style={active ? { borderLeftColor: route.color } : undefined}
       open={open}
       onToggle={(e) => setOpen(e.currentTarget.open)}
       onClickCapture={() => {
