@@ -2,7 +2,7 @@
 
 Browser tool for animated map flights — zoom from country to region, highlight areas, draw routes, pin markers — exported frame by frame as MP4 or image sequence for video editing.
 
-![Demo: camera flight with a highlighted area, a route and a marker](docs/demo.webp)
+![Demo: camera flight from Europe into Scandinavia with highlighted areas and a route](docs/demo.webp)
 
 > [!NOTE]
 > **Personal proof of concept, not a maintained product.** Built for my own video editing: German UI, defaults tuned for Germany/Europe, single user. It relies on free public map services that are not meant for heavy traffic (see [Limitations](#limitations--security)). Feel free to run it locally or fork it — no support, no guarantees.
