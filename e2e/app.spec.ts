@@ -723,6 +723,56 @@ test('mp4 export produces a valid file with the correct frame count', async ({ p
   }
 })
 
+test('export pauses while the tab is hidden and resumes with the full frame count', async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
+  await page.locator('[data-testid="camera-waypoint-0"]').getByLabel('Verweilzeit (s)').fill('0.2')
+  await page.locator('[data-testid="camera-waypoint-1"]').getByLabel('Flugzeit (s)').fill('1')
+  await page.locator('[data-testid="camera-waypoint-1"]').getByLabel('Verweilzeit (s)').fill('0.2')
+  await openSection(page, 'Export')
+  await page.selectOption('#exportFps', '24')
+
+  // Headless Chromium never really hides the page — fake the Page Visibility API instead.
+  const setHidden = (hidden: boolean) =>
+    page.evaluate((h) => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => h })
+      document.dispatchEvent(new Event('visibilitychange'))
+    }, hidden)
+
+  const downloadPromise = page.waitForEvent('download', { timeout: 60_000 })
+  await setHidden(true)
+  await page.getByRole('button', { name: 'Exportieren' }).click()
+  await expect(page.getByText('Export pausiert')).toBeVisible()
+  // Still paused a moment later: no frames are captured while hidden.
+  await page.waitForTimeout(500)
+  await expect(page.getByText('Export pausiert')).toBeVisible()
+
+  await setHidden(false)
+  const filePath = await (await downloadPromise).path()
+  expect(filePath).toBeTruthy()
+  if (!filePath) return
+
+  const expectedFrames = Math.round((0.2 + 1 + 0.2) * 24)
+  try {
+    const { stdout } = await execFileAsync('ffprobe', [
+      '-v',
+      'error',
+      '-count_frames',
+      '-select_streams',
+      'v:0',
+      '-show_entries',
+      'stream=nb_read_frames',
+      '-of',
+      'csv=p=0',
+      filePath,
+    ])
+    expect(Number(stdout.trim())).toBe(expectedFrames)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+    expect(statSync(filePath).size).toBeGreaterThan(1000)
+  }
+})
+
 test('project: reset clears markers/areas/route and restores the default camera, after confirming', async ({ page }) => {
   await gotoApp(page)
 

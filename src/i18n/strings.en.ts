@@ -186,6 +186,7 @@ export const en: typeof de = {
     },
     showAttribution: 'Show attribution',
     attributionHint: 'Attribution (OpenStreetMap) is required once the video is shown publicly.',
+    visibilityHint: 'Keep this tab visible while exporting: browsers pause rendering in background tabs and minimized windows. The export waits until you are back.',
     exportButton: 'Export',
     cancelButton: 'Cancel',
     secureContextWarning:

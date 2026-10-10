@@ -9,6 +9,48 @@ import type { TimingContext } from '../timeline/timing'
 import { createImageSequenceSink } from './imageSequenceSink'
 import { createMp4Sink } from './mp4Sink'
 
+/**
+ * Browsers pause requestAnimationFrame in hidden tabs/minimized windows, so MapLibre
+ * never renders there and waitIdle() would only time out and capture a stale canvas.
+ */
+function waitUntilVisible(): Promise<void> {
+  if (!document.hidden) return Promise.resolve()
+  return new Promise((resolve) => {
+    const onChange = () => {
+      if (document.hidden) return
+      document.removeEventListener('visibilitychange', onChange)
+      resolve()
+    }
+    document.addEventListener('visibilitychange', onChange)
+  })
+}
+
+/** waitIdle(), repeated until one full render happened while the tab stayed visible. */
+async function waitIdleWhileVisible(
+  controller: MapController,
+  onProgress: ((message: string) => void) | undefined,
+  isCancelled: () => boolean,
+): Promise<void> {
+  for (;;) {
+    if (document.hidden) {
+      onProgress?.('Export pausiert: Tab ist im Hintergrund. Zurück zum Tab, dann geht es weiter.')
+      await waitUntilVisible()
+      if (isCancelled()) throw new ExportCancelledError()
+    }
+    let wentHidden = false
+    const onChange = () => {
+      if (document.hidden) wentHidden = true
+    }
+    document.addEventListener('visibilitychange', onChange)
+    try {
+      await controller.waitIdle()
+    } finally {
+      document.removeEventListener('visibilitychange', onChange)
+    }
+    if (!wentHidden && !document.hidden) return
+  }
+}
+
 export class ExportCancelledError extends Error {
   constructor() {
     super('Export abgebrochen.')
@@ -94,7 +136,7 @@ export async function runExport({ controller, project, onProgress, isCancelled }
           controller.reorderAreaLayers(project.areas.map((a) => a.id))
           areasOrdered = true
         }
-        await controller.waitIdle()
+        await waitIdleWhileVisible(controller, onProgress, isCancelled)
         ctx.fillStyle = '#ffffff'
         ctx.fillRect(0, 0, width, height)
         ctx.drawImage(controller.map.getCanvas(), 0, 0, width, height)

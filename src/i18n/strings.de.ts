@@ -181,6 +181,7 @@ export const de = {
     },
     showAttribution: 'Quellenangabe einblenden',
     attributionHint: 'Die Quellenangabe (OpenStreetMap) ist Pflicht, sobald das Video öffentlich gezeigt wird.',
+    visibilityHint: 'Tab während des Exports sichtbar lassen: Browser pausieren das Rendern in Hintergrund-Tabs und minimierten Fenstern. Der Export wartet dann, bis du zurück bist.',
     exportButton: 'Exportieren',
     cancelButton: 'Abbrechen',
     secureContextWarning:

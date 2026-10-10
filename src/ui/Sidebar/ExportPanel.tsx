@@ -242,6 +242,7 @@ export function ExportPanel() {
         {t.showAttribution}
       </label>
       <p className={styles.hint}>{t.attributionHint}</p>
+      <p className={styles.hint}>{t.visibilityHint}</p>
 
       <div className={styles.btns} style={{ marginTop: 12 }}>
         <button type="button" className={styles.button} onClick={handleExport} disabled={locked}>
