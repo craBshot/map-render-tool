@@ -6,6 +6,7 @@ import { ExportCancelledError, runExport } from '../../export/frameLoop'
 import { isSecureContext } from '../../export/secureContext'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
+import { exportFileBaseName } from '../../state/projectFile'
 import type { ExportFormat, ResolutionPreset } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
 import { strings } from '../../i18n'
@@ -78,7 +79,7 @@ export function ExportPanel() {
         onProgress: setMessage,
         isCancelled: () => cancelledRef.current,
       })
-      downloadBlob(blob, `map-render_${project.export.resolution.width}x${project.export.resolution.height}_${project.export.fps}fps.${ext}`)
+      downloadBlob(blob, `${exportFileBaseName(project.name)}_${project.export.resolution.width}x${project.export.resolution.height}_${project.export.fps}fps.${ext}`)
       const mb = fmtNum(blob.size / 1048576, 1)
       setMessage(
         ext === 'mp4' ? t.doneMp4(fmtNum(totalFrames / project.export.fps, 1), mb) : t.doneImages(totalFrames, mb),

@@ -73,6 +73,9 @@ interface EditorStore {
    */
   dragPreview: { kind: DraggablePointKind; id: string; lng: number; lat: number; snapped: boolean } | null
   setDragPreview: (preview: EditorStore['dragPreview']) => void
+  /** Result of the last project save/open (button or drag & drop), shown in ProjectPanel. */
+  projectFileMessage: { text: string; isError: boolean } | null
+  setProjectFileMessage: (message: EditorStore['projectFileMessage']) => void
   /** Which Sidebar sections are expanded — not persisted, resets to DEFAULT_OPEN_SIDEBAR_SECTIONS on reload. */
   openSidebarSections: Record<SidebarSectionKey, boolean>
   setSidebarSectionOpen: (key: SidebarSectionKey, open: boolean) => void
@@ -116,6 +119,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setSelectedObjectId: (id) => set({ selectedObjectId: id }),
   dragPreview: null,
   setDragPreview: (preview) => set({ dragPreview: preview }),
+  projectFileMessage: null,
+  setProjectFileMessage: (message) => set({ projectFileMessage: message }),
   openSidebarSections: DEFAULT_OPEN_SIDEBAR_SECTIONS,
   setSidebarSectionOpen: (key, open) => set((state) => ({ openSidebarSections: { ...state.openSidebarSections, [key]: open } })),
   focusFieldRequest: null,

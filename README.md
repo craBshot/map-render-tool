@@ -15,6 +15,7 @@ Browser tool for animated map flights — zoom from country to region, highlight
 - **Routes**, as many as needed, each via street routing (OSRM) or straight lines in its own color — drawn progressively, chainable end to end
 - **Timeline** to set when each object appears
 - **Deterministic export:** every frame is rendered from the project state, so the video matches the preview exactly — MP4 (H.264, WebCodecs) or PNG/JPEG sequence; landscape, portrait and square formats up to 4K, 24–60 fps
+- **Projects as files:** save as `<name>.maprender.json`, open via button or drag & drop; full undo/redo
 - **Local area database:** a background worker slowly builds a local copy of area boundaries, so lookups don't depend on the public Overpass API being available
 
 ## Quick start

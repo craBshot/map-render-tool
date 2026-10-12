@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { useEditorStore } from '../state/editorStore'
+import { ProjectFileDropZone } from './ProjectFileDropZone'
 import { Sidebar } from './Sidebar/Sidebar'
 import { Splitter } from './Splitter'
 import { MapStage } from './Stage/MapStage'
@@ -50,6 +51,7 @@ export function App() {
           <Timeline />
         </div>
       </main>
+      <ProjectFileDropZone />
     </div>
   )
 }

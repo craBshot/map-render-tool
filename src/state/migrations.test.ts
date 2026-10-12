@@ -99,7 +99,7 @@ describe('migrate', () => {
 
     const migrated = migrate(v1)
 
-    expect(migrated.version).toBe(8)
+    expect(migrated.version).toBe(PROJECT_VERSION)
     expect(migrated.areas).toEqual([])
     expect(migrated.areaStyles).toHaveLength(2)
     expect(migrated.routes).toEqual([])
@@ -111,7 +111,7 @@ describe('migrate', () => {
 
     const migrated = migrate(v2)
 
-    expect(migrated.version).toBe(8)
+    expect(migrated.version).toBe(PROJECT_VERSION)
     expect(migrated.routes).toEqual([])
   })
 
@@ -137,7 +137,7 @@ describe('migrate', () => {
 
     const migrated = migrate(v3)
 
-    expect(migrated.version).toBe(8)
+    expect(migrated.version).toBe(PROJECT_VERSION)
     expect(migrated.routes[0]).not.toHaveProperty('profile')
     expect(migrated.routes[0]).not.toHaveProperty('drawSpeedKmh')
     expect(migrated.routes[0]).not.toHaveProperty('reveal')
@@ -152,7 +152,7 @@ describe('migrate', () => {
   it('migrates a v3 project with no route (route: null) to the current version', () => {
     const v3 = { ...oldV4Project(), version: 3, route: null }
     const migrated = migrate(v3)
-    expect(migrated.version).toBe(8)
+    expect(migrated.version).toBe(PROJECT_VERSION)
     expect(migrated.routes).toEqual([])
   })
 
@@ -245,7 +245,7 @@ describe('migrate', () => {
         }),
       )
 
-      expect(migrated.version).toBe(8)
+      expect(migrated.version).toBe(PROJECT_VERSION)
       expect(migrated.routes[0]?.waypoints).toHaveLength(3)
       expect(migrated.routes[0]?.waypoints[0]).toMatchObject({ lng: 0, lat: 0, holdSec: 0, travelSec: 0 })
       expect(migrated.routes[0]?.waypoints[1]).toMatchObject({ lng: 1, lat: 1, holdSec: 0, travelSec: 3 })
@@ -298,19 +298,28 @@ describe('migrate', () => {
 
     it('passes route: null through unchanged', () => {
       const migrated = migrate(v6WithRoute(null))
-      expect(migrated.version).toBe(8)
+      expect(migrated.version).toBe(PROJECT_VERSION)
       expect(migrated.routes).toEqual([])
     })
 
     it('bumps the version to 7 (and on through the current version)', () => {
-      expect(migrate(v6WithRoute(null)).version).toBe(8)
+      expect(migrate(v6WithRoute(null)).version).toBe(PROJECT_VERSION)
+    })
+  })
+
+  describe('v8 -> v9: project name', () => {
+    it('existing projects start untitled', () => {
+      const { name: _name, ...v8 } = migrate(oldV4Project())
+      const migrated = migrate({ ...v8, version: 8 })
+      expect(migrated.version).toBe(9)
+      expect(migrated.name).toBe('')
     })
   })
 
   describe('v7 -> v8: single route -> routes list', () => {
     /** A current project reshaped back to v7: single `route` instead of `routes`. */
     function v7(route: Record<string, unknown> | null): Record<string, unknown> {
-      const { routes: _routes, ...rest } = migrate(oldV4Project())
+      const { routes: _routes, name: _name, ...rest } = migrate(oldV4Project())
       return { ...rest, version: 7, route }
     }
 
@@ -328,7 +337,6 @@ describe('migrate', () => {
         appear: { startSec: 2 },
       }
       const migrated = migrate(v7(route))
-      expect(migrated.version).toBe(8)
       expect(migrated.routes).toEqual([route])
       expect(migrated).not.toHaveProperty('route')
     })

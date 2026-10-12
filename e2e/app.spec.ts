@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { statSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { promisify } from 'node:util'
 import { expect, test } from '@playwright/test'
 import { mockExternalServices, type MockExternalServicesOptions } from './fixtures/routeMocks'
@@ -942,6 +942,97 @@ test('export pauses while the tab is hidden and resumes with the full frame coun
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
     expect(statSync(filePath).size).toBeGreaterThan(1000)
   }
+})
+
+test('project file: save, reset, then open restores the project (name included); a foreign JSON is rejected', async ({ page }) => {
+  page.on('dialog', (dialog) => dialog.accept())
+  await gotoApp(page)
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+  await canvas.click({ button: 'right', position: { x: 260, y: 180 } })
+  await expect.poll(() => markerDotCount(page)).toBe(2)
+
+  await openSection(page, 'Projekt')
+  await page.getByLabel('Projektname').fill('Harz: Tag 1')
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Projekt speichern' }).click()
+  const download = await downloadPromise
+  expect(download.suggestedFilename()).toBe('Harz_ Tag 1.maprender.json')
+  const savedPath = await download.path()
+  const saved = JSON.parse(readFileSync(savedPath!, 'utf8'))
+  expect(saved).toMatchObject({ app: 'map-render-tool', name: 'Harz: Tag 1' })
+  expect(saved.markers).toHaveLength(2)
+
+  await page.getByRole('button', { name: 'Projekt zurücksetzen' }).click()
+  await expect.poll(() => markerDotCount(page)).toBe(0)
+  await expect(page.getByLabel('Projektname')).toHaveValue('')
+
+  await page.getByTestId('project-file-input').setInputFiles({
+    name: download.suggestedFilename(),
+    mimeType: 'application/json',
+    buffer: readFileSync(savedPath!),
+  })
+  await expect.poll(() => markerDotCount(page)).toBe(2)
+  await expect(page.getByLabel('Projektname')).toHaveValue('Harz: Tag 1')
+  await expect(page.getByText('Harz_ Tag 1.maprender.json geöffnet.')).toBeVisible()
+
+  // Opening is one undo step.
+  await page.getByText('Speichert alles als').click() // leave the name field so Ctrl+Z is the app's undo
+  await page.keyboard.press('Control+z')
+  await expect.poll(() => markerDotCount(page)).toBe(0)
+  await page.keyboard.press('Control+Shift+z')
+  await expect.poll(() => markerDotCount(page)).toBe(2)
+
+  await page.getByTestId('project-file-input').setInputFiles({
+    name: 'something.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ foo: 1 })),
+  })
+  await expect(page.getByText('Das ist keine Map-Render-Tool-Projektdatei.')).toBeVisible()
+  await expect.poll(() => markerDotCount(page)).toBe(2) // unchanged
+})
+
+test('project file: dropping a project file onto the window opens it', async ({ page }) => {
+  await gotoApp(page)
+  // A file saved by an older version (v8, no name yet) — also exercises the migration on open.
+  const content = JSON.stringify({
+    app: 'map-render-tool',
+    savedWith: '0.9.0',
+    version: 8,
+    camera: { waypoints: [{ id: 'c1', lng: 10, lat: 51, zr: 4, holdSec: 1, travelSec: 0 }] },
+    style: { id: 'positron', labelDensity: 1, germanNames: true, hideMinorLabels: true },
+    markers: [
+      {
+        id: 'm1',
+        lng: 10,
+        lat: 51,
+        color: '#d64545',
+        sizePx: 9,
+        pulse: { enabled: true, periodSec: 1.6, scale: 3.2, strength: 0.45 },
+        appear: { startSec: 0, fadeInSec: 0.4, fadeOutSec: 0 },
+        visible: true,
+      },
+    ],
+    areas: [],
+    areaStyles: [],
+    routes: [],
+    export: { resolution: { preset: '1920x1080', width: 1920, height: 1080 }, fps: 30, format: 'mp4', quality: 0.35, showAttribution: true },
+  })
+
+  await page.evaluate((text) => {
+    const dt = new DataTransfer()
+    dt.items.add(new File([text], 'dropped.maprender.json', { type: 'application/json' }))
+    window.dispatchEvent(new DragEvent('dragenter', { dataTransfer: dt }))
+  }, content)
+  await expect(page.getByTestId('project-drop-overlay')).toBeVisible()
+  await page.evaluate((text) => {
+    const dt = new DataTransfer()
+    dt.items.add(new File([text], 'dropped.maprender.json', { type: 'application/json' }))
+    window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, cancelable: true }))
+  }, content)
+  await expect(page.getByTestId('project-drop-overlay')).toHaveCount(0)
+  await expect.poll(() => markerDotCount(page)).toBe(1)
+  await expect(page.getByText('dropped.maprender.json geöffnet.')).toBeVisible()
 })
 
 test('project: reset clears markers/areas/route and restores the default camera, after confirming', async ({ page }) => {

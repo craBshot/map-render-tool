@@ -24,6 +24,8 @@ interface ProjectStore {
   history: History<ProjectFile>
   autoExtendNotice: AutoExtendNotice | null
   setProject: (updater: (project: ProjectFile) => ProjectFile) => void
+  /** Replaces the whole project (opened file) as one undo step, exactly as loaded — never auto-extended. */
+  replaceProject: (project: ProjectFile) => void
   undo: () => void
   redo: () => void
   /** Pointer pressed: the next setProject starts a new undo step; auto-extend waits for pointerUp. */
@@ -67,6 +69,12 @@ export const useProjectStore = create<ProjectStore>((set) => ({
         history: merge ? state.history : pushStep(state.history, state.project),
         ...(extension && { autoExtendNotice: notice(extension.totalSec, extension.cause) }),
       }
+    }),
+  replaceProject: (project) =>
+    set((state) => {
+      stepOpen = false
+      persistProject(project)
+      return { project, history: pushStep(state.history, state.project), autoExtendNotice: null }
     }),
   undo: () =>
     set((state) => {

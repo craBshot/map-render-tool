@@ -1,4 +1,4 @@
-export const PROJECT_VERSION = 8
+export const PROJECT_VERSION = 9
 
 /**
  * crypto.randomUUID() requires a secure context, but this app must also
@@ -174,6 +174,8 @@ export interface ExportSettings {
  */
 export interface ProjectFile {
   version: number
+  /** User-given project name ('' = untitled); used for save/export file names. */
+  name: string
   camera: CameraState
   style: StyleState
   // A single-element list already, so the later move to a shared
@@ -182,7 +184,6 @@ export interface ProjectFile {
   // Order is stacking order: earlier entries render on top.
   areas: AreaObject[]
   areaStyles: AreaStyle[]
-  // Single route for v1 — additive to widen into a list later, same as markers.
   routes: RouteObject[]
   export: ExportSettings
 }
@@ -297,6 +298,7 @@ export function createDefaultRoute(waypoints: RouteWaypoint[]): RouteObject {
 export function createDefaultProject(): ProjectFile {
   return {
     version: PROJECT_VERSION,
+    name: '',
     camera: {
       waypoints: [
         createDefaultCameraWaypoint(10, 51, 4, { holdSec: 1, travelSec: 0 }),
