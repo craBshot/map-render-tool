@@ -11,7 +11,8 @@ function pt(kind: HitPoint['kind'], id: string, index: number, lng: number, lat:
 
 function project(overrides: Partial<ProjectFile> = {}): ProjectFile {
   return {
-    version: 8,
+    version: 9,
+    name: '',
     camera: { waypoints: [] },
     style: { id: 'positron', labelDensity: 1, germanNames: true, hideMinorLabels: false },
     markers: [],

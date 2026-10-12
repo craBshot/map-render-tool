@@ -4,7 +4,8 @@ import type { ProjectFile } from './types'
 
 function baseProject(overrides: Partial<ProjectFile> = {}): ProjectFile {
   return {
-    version: 7,
+    version: 9,
+    name: '',
     camera: {
       waypoints: [
         { id: 'c1', lng: 10, lat: 51, zr: 4, holdSec: 1, travelSec: 0 },

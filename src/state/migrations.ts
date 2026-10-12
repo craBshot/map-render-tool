@@ -175,6 +175,8 @@ const migrations: Record<number, Migration> = {
     const { route, ...rest } = data as { route: Record<string, unknown> | null }
     return { ...rest, version: 8, routes: route ? [route] : [] }
   },
+  // v8 -> v9: projects got a name (for save/export file names); existing ones start untitled.
+  8: (data) => ({ ...(data as object), version: 9, name: '' }),
 }
 
 export class UnsupportedProjectVersionError extends Error {

@@ -37,7 +37,8 @@ function area(id: string, geometry: AreaObject['geometry'], overrides: Partial<A
 
 function project(overrides: Partial<ProjectFile> = {}): ProjectFile {
   return {
-    version: 7,
+    version: 9,
+    name: '',
     camera: { waypoints: [] },
     style: { id: 'positron', labelDensity: 1, germanNames: true, hideMinorLabels: false },
     markers: [],
