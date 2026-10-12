@@ -5,8 +5,8 @@ import type { de } from './strings.de'
 // drop-in.
 export const en: typeof de = {
   app: {
-    title: 'Map Zoom',
-    lede: 'Frame the map, set start and end, export as video or image sequence.',
+    title: 'Map Render Tool',
+    lede: 'Plan camera flights across the map, with markers, areas and routes, and export them as video or image sequence. The camera flight sets the video length.',
   },
   search: {
     heading: 'Find a place',
@@ -25,6 +25,7 @@ export const en: typeof de = {
   timeline: {
     cameraRow: 'Camera flight',
     routeRow: 'Route',
+    lengthHint: 'video length = camera flight',
   },
   camera: {
     heading: 'Camera flight',

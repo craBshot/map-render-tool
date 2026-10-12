@@ -38,7 +38,11 @@ export function TimelineRuler({ playing, locked, playbackTimeSec, totalSec, onPl
         <div className={styles.playhead} style={{ left: `${progressPct}%` }} />
       </div>
       <div className={styles.time}>
-        {fmtNum(playbackTimeSec, 1)} / {fmtNum(totalSec, 1)} s
+        <span data-testid="time-readout">
+          {fmtNum(playbackTimeSec, 1)} / {fmtNum(totalSec, 1)} s
+        </span>
+        {' · '}
+        {strings.timeline.lengthHint}
       </div>
     </div>
   )

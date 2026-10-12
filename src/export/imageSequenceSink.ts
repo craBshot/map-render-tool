@@ -14,7 +14,7 @@ export async function createImageSequenceSink(format: 'jpeg' | 'png'): Promise<F
           canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('canvas.toBlob() returned null'))), mimeType, 0.95)
         })
       }
-      zip.file(`kartenzoom_${String(index + 1).padStart(5, '0')}.${ext}`, lastBlob)
+      zip.file(`map-render_${String(index + 1).padStart(5, '0')}.${ext}`, lastBlob)
     },
     async finish(onProgress) {
       const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, (meta) => {

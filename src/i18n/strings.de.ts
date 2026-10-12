@@ -1,7 +1,7 @@
 export const de = {
   app: {
-    title: 'Karten-Zoom',
-    lede: 'Karte ausrichten, Start und Ziel merken, als Video oder Bildsequenz exportieren.',
+    title: 'Map Render Tool',
+    lede: 'Kamerafahrten über die Karte planen, mit Markern, Gebieten und Routen, und als Video oder Bildsequenz exportieren. Die Kamerafahrt bestimmt die Videolänge.',
   },
   search: {
     heading: 'Ort finden',
@@ -20,6 +20,7 @@ export const de = {
   timeline: {
     cameraRow: 'Kamerafahrt',
     routeRow: 'Route',
+    lengthHint: 'Videolänge = Kamerafahrt',
   },
   camera: {
     heading: 'Kamerafahrt',

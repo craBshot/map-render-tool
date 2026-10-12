@@ -9,7 +9,7 @@ Browser tool for animated map flights — zoom from country to region, highlight
 
 ## Features
 
-- **Camera flight** across any number of waypoints, with zoom, hold and travel times
+- **Camera flight** across any number of waypoints, with zoom, hold and travel times — it sets the video length, everything else is timed within it
 - **Markers** with name labels and a pulse effect
 - **Areas** (administrative boundaries, national parks, nature reserves) from OpenStreetMap, picked with a right-click
 - **Routes**, as many as needed, each via street routing (OSRM) or straight lines in its own color — drawn progressively, chainable end to end

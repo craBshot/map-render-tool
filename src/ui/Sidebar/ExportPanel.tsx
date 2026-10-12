@@ -78,7 +78,7 @@ export function ExportPanel() {
         onProgress: setMessage,
         isCancelled: () => cancelledRef.current,
       })
-      downloadBlob(blob, `kartenzoom_${project.export.resolution.width}x${project.export.resolution.height}_${project.export.fps}fps.${ext}`)
+      downloadBlob(blob, `map-render_${project.export.resolution.width}x${project.export.resolution.height}_${project.export.fps}fps.${ext}`)
       const mb = fmtNum(blob.size / 1048576, 1)
       setMessage(
         ext === 'mp4' ? t.doneMp4(fmtNum(totalFrames / project.export.fps, 1), mb) : t.doneImages(totalFrames, mb),
