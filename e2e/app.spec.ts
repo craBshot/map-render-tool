@@ -765,7 +765,7 @@ test('preview runs and advances the time readout', async ({ page }) => {
   await page.locator('[data-testid="camera-waypoint-0"]').getByLabel('Verweilzeit (s)').fill('0.2')
   await page.locator('[data-testid="camera-waypoint-1"]').getByLabel('Flugzeit (s)').fill('0.5')
   await page.locator('[data-testid="camera-waypoint-1"]').getByLabel('Verweilzeit (s)').fill('0.2')
-  const timeReadout = page.locator('text=/\\d,\\d \\/ 0,9 s/')
+  const timeReadout = page.getByTestId('time-readout')
 
   await expect(timeReadout).toHaveText('0,0 / 0,9 s')
   await page.getByRole('button', { name: 'Vorschau abspielen' }).click()
