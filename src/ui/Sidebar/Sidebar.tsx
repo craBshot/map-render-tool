@@ -44,6 +44,10 @@ export function Sidebar() {
         <ExportPanel />
         <ProjectPanel />
       </div>
+
+      <p className={styles.buildInfo} data-testid="build-info">
+        v{__APP_VERSION__} · {__GIT_COMMIT__}
+      </p>
     </aside>
   )
 }
