@@ -4,12 +4,14 @@ import { Sidebar } from './Sidebar/Sidebar'
 import { Splitter } from './Splitter'
 import { MapStage } from './Stage/MapStage'
 import { Timeline } from './Timeline/Timeline'
+import { useUndoShortcuts } from './useUndoShortcuts'
 import styles from './App.module.css'
 
 export function App() {
   const sidebarWidthPx = useEditorStore((s) => s.sidebarWidthPx)
   const timelineHeightPx = useEditorStore((s) => s.timelineHeightPx)
   const timelineWrapperRef = useRef<HTMLDivElement>(null)
+  useUndoShortcuts()
 
   const sidebarStartRef = useRef<number | null>(null)
   function resizeSidebar(deltaPx: number) {

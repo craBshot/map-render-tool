@@ -27,7 +27,7 @@ cd map-render-tool
 docker compose up -d --build
 ```
 
-Open <http://localhost:8080>. Right-click the map to place things; the mode buttons on the left switch between markers, areas, route and camera.
+Open <http://localhost:8080>. Right-click the map to place things; the mode buttons on the left switch between markers, areas, route and camera. `Ctrl+Z` / `Ctrl+Shift+Z` undo and redo.
 
 **Keep the tab visible while exporting.** Browsers pause rendering in background tabs and minimized windows; the export then pauses too and resumes when you return. A visible window next to other apps is fine.
 

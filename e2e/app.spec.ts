@@ -100,7 +100,7 @@ async function getRouteId(page: import('@playwright/test').Page): Promise<string
 /** The project's raw marker list, read straight from the persisted project state. */
 async function getMarkers(
   page: import('@playwright/test').Page,
-): Promise<{ id: string; appear: { startSec: number; fadeInSec: number; holdSec?: number; fadeOutSec: number } }[]> {
+): Promise<{ id: string; name?: string; appear: { startSec: number; fadeInSec: number; holdSec?: number; fadeOutSec: number } }[]> {
   return page.evaluate(() => {
     const raw = localStorage.getItem('map-render-tool:project')
     if (!raw) return []
@@ -207,6 +207,44 @@ test('marker: naming it shows a text label layer on the map', async ({ page }) =
   // Clearing the name hides the label again rather than showing an empty string.
   await page.getByRole('textbox', { name: 'Name' }).fill('')
   await expect.poll(async () => (await labelState())?.visibility).not.toBe('visible')
+})
+
+test('undo/redo: Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y step through separate edits', async ({ page }) => {
+  await gotoApp(page)
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  // Nothing to undo right after loading — must not throw or change anything.
+  await page.keyboard.press('Control+z')
+  expect(await getMarkers(page)).toHaveLength(0)
+
+  await canvas.click({ button: 'right', position: { x: 200, y: 150 } })
+  await canvas.click({ button: 'right', position: { x: 260, y: 180 } })
+  await expect.poll(() => markerDotCount(page)).toBe(2)
+
+  await page.keyboard.press('Control+z')
+  await expect.poll(() => markerDotCount(page)).toBe(1)
+  await page.keyboard.press('Control+z')
+  await expect.poll(() => markerDotCount(page)).toBe(0)
+  await page.keyboard.press('Control+Shift+z')
+  await expect.poll(() => markerDotCount(page)).toBe(1)
+  await page.keyboard.press('Control+y')
+  await expect.poll(() => markerDotCount(page)).toBe(2)
+})
+
+test('undo/redo: typing into a field is one undo step', async ({ page }) => {
+  await gotoApp(page)
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
+  await openSection(page, 'Marker')
+  const name = page.getByRole('textbox', { name: 'Name' })
+  await name.click()
+  await name.pressSequentially('Hütte')
+  await expect.poll(async () => (await getMarkers(page))[0]?.name).toBe('Hütte')
+
+  // Leave the field (any click is an undo-step boundary), then one Ctrl+Z reverts the whole word.
+  await page.getByText('Rechtsklick auf die Karte fügt dort einen Marker hinzu.').click()
+  await page.keyboard.press('Control+z')
+  await expect.poll(async () => (await getMarkers(page))[0]?.name ?? '').toBe('')
+  expect(await getMarkers(page)).toHaveLength(1) // the marker itself was a separate, earlier step
+  await expect(name).toHaveValue('')
 })
 
 test('timeline: dragging a marker\'s bar changes its startSec, and a plain click selects it', async ({ page }) => {
