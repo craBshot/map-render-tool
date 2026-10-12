@@ -12,6 +12,11 @@ export const de = {
     serviceError: (status: number) => `Suchdienst antwortet nicht (${status})`,
     failedPrefix: 'Suche fehlgeschlagen: ',
   },
+  autoExtend: {
+    message: (seconds: string, cause: string) => `Kamerafahrt auf ${seconds} s verlängert – ${cause} lief länger.`,
+    undo: 'Rückgängig',
+    dismiss: 'Schließen',
+  },
   playback: {
     play: 'Vorschau abspielen',
     stop: 'Vorschau stoppen',
