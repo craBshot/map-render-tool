@@ -54,7 +54,7 @@ Stack: TypeScript, React, Vite, MapLibre GL JS, Zustand; worker in plain Node.js
 
 ## How it was built
 
-Concept, product decisions and testing by me; code written with [Claude Code](https://claude.com/claude-code) as an AI pair programmer. All features were built over four days (see the commit history). [`CLAUDE.md`](CLAUDE.md) holds the project brief and architecture decisions the AI works from.
+Concept, product decisions and testing by me; code written with [Claude Code](https://claude.com/claude-code) as an AI pair programmer. [`CLAUDE.md`](CLAUDE.md) holds the project brief and architecture decisions the AI works from.
 
 ## Limitations & security
 
