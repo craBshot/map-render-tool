@@ -1,4 +1,6 @@
 FROM node:22-alpine AS build
+# git: vite.config.ts reads the commit hash for the Sidebar's build info (.git is part of the context for this).
+RUN apk add --no-cache git
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
