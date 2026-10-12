@@ -17,6 +17,11 @@ export const en: typeof de = {
     serviceError: (status: number) => `Search service not responding (${status})`,
     failedPrefix: 'Search failed: ',
   },
+  autoExtend: {
+    message: (seconds: string, cause: string) => `Camera flight extended to ${seconds} s – ${cause} ran longer.`,
+    undo: 'Undo',
+    dismiss: 'Dismiss',
+  },
   playback: {
     play: 'Play preview',
     stop: 'Stop preview',

@@ -21,6 +21,7 @@ import {
   resolveAreaStyle,
 } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
+import { AutoExtendToast } from '../AutoExtendToast'
 import { CameraWaypointMarkers } from './CameraWaypointMarkers'
 import { Crosshair } from './Crosshair'
 import { Readout } from './Readout'
@@ -250,6 +251,7 @@ export function MapStage() {
         <CameraWaypointMarkers />
         <SnapIndicator />
       </div>
+      <AutoExtendToast />
     </div>
   )
 }

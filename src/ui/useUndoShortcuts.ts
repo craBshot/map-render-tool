@@ -10,8 +10,9 @@ function isTextEntry(target: EventTarget | null): boolean {
 }
 
 /**
- * Global project undo/redo: Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl/Cmd+Y. Every pointerdown also
- * closes the current undo step, so separate clicks never merge (see store.ts's COALESCE_MS).
+ * Global project undo/redo: Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl/Cmd+Y. Pointer presses are also
+ * reported to the store: each one closes the current undo step (separate clicks never merge, see
+ * store.ts's COALESCE_MS), and auto-extending the camera flight waits for the release.
  */
 export function useUndoShortcuts(): void {
   useEffect(() => {
@@ -28,13 +29,19 @@ export function useUndoShortcuts(): void {
       else useProjectStore.getState().redo()
     }
     function onPointerDown() {
-      useProjectStore.getState().breakUndoStep()
+      useProjectStore.getState().pointerDown()
+    }
+    function onPointerUp() {
+      useProjectStore.getState().pointerUp()
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('pointerdown', onPointerDown, true)
+    // pointercancel/blur too: a release outside the window must not leave auto-extend waiting forever.
+    for (const type of ['pointerup', 'pointercancel', 'blur'] as const) window.addEventListener(type, onPointerUp, true)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('pointerdown', onPointerDown, true)
+      for (const type of ['pointerup', 'pointercancel', 'blur'] as const) window.removeEventListener(type, onPointerUp, true)
     }
   }, [])
 }

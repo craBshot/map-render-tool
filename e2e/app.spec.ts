@@ -230,6 +230,39 @@ test('undo/redo: Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y step through separate edits', as
   await expect.poll(() => markerDotCount(page)).toBe(2)
 })
 
+test('auto-extend: a route running past the video end lengthens the camera flight, with a toast whose Undo reverts both', async ({
+  page,
+}) => {
+  await gotoApp(page)
+  const readout = page.getByTestId('time-readout')
+  await expect(readout).toHaveText('0,0 / 7,0 s')
+
+  await page.getByRole('radio', { name: 'Route planen' }).click()
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  // Default route: appears at 1 s, each waypoint 1 s hold + 3 s travel -> 3 waypoints end at 1 + 1 + 4 + 4 = 10 s.
+  await canvas.click({ button: 'right', position: { x: 150, y: 120 } })
+  await canvas.click({ button: 'right', position: { x: 250, y: 130 } })
+  await expect(readout).toHaveText('0,0 / 7,0 s') // 6 s route still fits
+  await expect(page.getByTestId('auto-extend-toast')).toHaveCount(0)
+  await canvas.click({ button: 'right', position: { x: 200, y: 200 } })
+
+  await expect(readout).toHaveText('0,0 / 10,0 s')
+  const toast = page.getByTestId('auto-extend-toast')
+  await expect(toast).toContainText('Kamerafahrt auf 10,0 s verlängert – Route lief länger.')
+
+  await toast.getByRole('button', { name: 'Rückgängig' }).click()
+  await expect(readout).toHaveText('0,0 / 7,0 s')
+  await expect.poll(() => getRouteWaypoints(page)).toHaveLength(2) // the 3rd waypoint went with it — one step
+  await expect(toast).toHaveCount(0)
+
+  // Shortening the camera flight yourself never re-extends it.
+  await canvas.click({ button: 'right', position: { x: 200, y: 200 } })
+  await expect(readout).toHaveText('0,0 / 10,0 s')
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
+  await page.locator('[data-testid="camera-waypoint-1"]').getByLabel('Verweilzeit (s)').fill('2')
+  await expect(readout).toHaveText('0,0 / 7,0 s')
+})
+
 test('undo/redo: typing into a field is one undo step', async ({ page }) => {
   await gotoApp(page)
   await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 200, y: 150 } })
@@ -785,9 +818,10 @@ test('marker: dragging the fadeIn edge changes fadeInSec; unchecking hold-foreve
   const holdY = holdBox.y + holdBox.height / 2
   const holdStartX = holdBox.x + holdBox.width / 2
   // Drag left, not right: startSec(5) + fadeInSec(0.4) + holdSec(2) = 7.4s
-  // already exceeds the default totalSec (7), so this handle's position is
-  // clamped at the track's right edge — dragging further right has no room
-  // to move (fracX is already saturated at 1). Left has room to shrink.
+  // exceeds the default totalSec (7), so the camera flight auto-extends to
+  // exactly 7.4s and this handle sits at the track's right edge — dragging
+  // further right has no room to move (fracX is already saturated at 1).
+  // Left has room to shrink.
   await page.mouse.move(holdStartX, holdY)
   await page.mouse.down()
   await page.mouse.move(holdStartX - trackBox.width * 0.05, holdY, { steps: 4 })
