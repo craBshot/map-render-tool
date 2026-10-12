@@ -31,7 +31,12 @@ Open <http://localhost:8080>. Right-click the map to place things; the mode butt
 
 **Keep the tab visible while exporting.** Browsers pause rendering in background tabs and minimized windows; the export then pauses too and resumes when you return. A visible window next to other apps is fine.
 
-**MP4 export** needs a secure context (`localhost` or HTTPS). Over plain HTTP from another machine, use the image sequence export instead.
+**MP4 export** needs a secure context (`localhost` or HTTPS). When the tool runs on another machine in your network over plain HTTP, you can either:
+
+- put it behind a reverse proxy with HTTPS, or
+- whitelist that one address in a Chromium-based browser (Chrome, Edge, Brave): open `chrome://flags/#unsafely-treat-insecure-origin-as-secure` (`brave://flags/…` in Brave), enter e.g. `http://192.168.1.20:8080`, enable it and restart the browser. This only affects the address you enter; the browser shows a warning bar after each restart as a reminder.
+
+Otherwise, the image sequence export works everywhere.
 
 Stop with `docker compose down`. The area database lives in the `map-render-tool_area-db-data` volume and survives restarts (`down -v` deletes it).
 
