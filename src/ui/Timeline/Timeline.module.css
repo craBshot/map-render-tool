@@ -216,3 +216,40 @@
   user-select: none;
   z-index: 2;
 }
+
+/* Camera keyframe: a waypoint's arrival — diamond on the travel→hold boundary, draggable except the first. */
+.keyframe {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  transform: translateY(-50%) rotate(45deg);
+  background: #fff;
+  border: 2px solid #6b3fa0;
+  border-radius: 2px;
+  box-sizing: border-box;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 2;
+}
+.keyframe:hover {
+  background: #e4d8f2;
+}
+.keyframeFixed {
+  cursor: default;
+}
+.keyframeFixed:hover {
+  background: #fff;
+}
+.keyframeLabel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-45deg);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  color: #6b3fa0;
+  pointer-events: none;
+}

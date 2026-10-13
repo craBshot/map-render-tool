@@ -2,7 +2,7 @@ import type { AppearTiming } from '../../state/types'
 import { resolveHoldSec, type TimingContext } from '../../timeline/timing'
 import { chainSegments, type ChainSegment, type ChainWaypoint } from '../../timeline/waypointChain'
 
-function pct(sec: number, totalSec: number): number {
+export function pct(sec: number, totalSec: number): number {
   if (totalSec <= 0) return 0
   return Math.min(100, Math.max(0, (sec / totalSec) * 100))
 }
@@ -59,8 +59,8 @@ export interface ChainSegmentLayout extends ChainSegment {
 
 /**
  * A waypoint chain's hold/travel legs as percentage-of-track layout —
- * shared by the camera row (visualized, not draggable) and the route row
- * (visualized AND draggable — see TimelineSegmentBoundaryHandle.tsx).
+ * shared by the camera row and the route row (both draggable — see
+ * TimelineKeyframeHandle.tsx / TimelineSegmentBoundaryHandle.tsx).
  * `minTravelSec` matches whatever floor the chain's own domain uses (see
  * chainSegments()) — 0 for routes, camera.ts's MIN_TRAVEL_SEC for camera.
  * `offsetSec` shifts the whole chain in project time — the camera's chain
