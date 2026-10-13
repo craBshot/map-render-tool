@@ -7,6 +7,7 @@ import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/store'
 import { resolveAreaStyle, resolveSelectedRoute, type AppearTiming, type AreaObject, type AreaStyle } from '../../state/types'
 import type { TimingContext } from '../../timeline/timing'
+import { moveChainWaypoint, resizeChainHold } from '../../timeline/waypointChain'
 import { strings } from '../../i18n'
 import { routeLabel } from '../format'
 import { TimelineCameraRow } from './TimelineCameraRow'
@@ -84,18 +85,13 @@ export function Timeline() {
     }))
   }
 
-  /** floor matches CameraPanel.tsx's own number-field clamps — Math.max(0, ...) for holdSec, Math.max(MIN_TRAVEL_SEC, ...) for travelSec. */
-  function updateCameraWaypointTiming(waypointId: string, kind: 'hold' | 'travel', valueSec: number) {
-    setProject((p) => ({
-      ...p,
-      camera: {
-        waypoints: p.camera.waypoints.map((w) =>
-          w.id === waypointId
-            ? { ...w, [kind === 'hold' ? 'holdSec' : 'travelSec']: Math.max(kind === 'travel' ? MIN_TRAVEL_SEC : 0, valueSec) }
-            : w,
-        ),
-      },
-    }))
+  /** Keyframe semantics (see waypointChain.ts): only this waypoint moves in time, the rest stay put. CameraPanel's number fields keep the plain per-field edit. */
+  function moveCameraKeyframe(waypointId: string, arrivalSec: number) {
+    setProject((p) => ({ ...p, camera: { waypoints: moveChainWaypoint(p.camera.waypoints, waypointId, arrivalSec, MIN_TRAVEL_SEC) } }))
+  }
+
+  function resizeCameraHold(waypointId: string, _kind: 'hold', holdSec: number) {
+    setProject((p) => ({ ...p, camera: { waypoints: resizeChainHold(p.camera.waypoints, waypointId, holdSec, MIN_TRAVEL_SEC) } }))
   }
 
   /** floor matches RoutePanel.tsx's "Zeitpunkt (s)" field (Math.max(0, ...)). */
@@ -197,7 +193,7 @@ export function Timeline() {
         onSeek={seek}
       />
       <div className={styles.rows}>
-        <TimelineCameraRow waypoints={project.camera.waypoints} ctx={ctx} onResizeSegment={updateCameraWaypointTiming} />
+        <TimelineCameraRow waypoints={project.camera.waypoints} ctx={ctx} onMoveKeyframe={moveCameraKeyframe} onResizeHold={resizeCameraHold} />
         {project.markers.map((marker) => (
           <TimelineObjectRow
             key={marker.id}

@@ -776,6 +776,54 @@ test('camera: dragging a segment boundary on the Timeline changes that waypoint\
   expect(Number(sidebarValue)).toBeCloseTo(afterDrag.holdSec, 6)
 })
 
+/** Absolute arrival time per camera waypoint, from the stored hold/travel chain (no MIN_TRAVEL_SEC clamping needed — stored values already respect it). */
+function cameraArrivals(wps: { holdSec: number; travelSec: number }[]): number[] {
+  const out: number[] = []
+  let t = 0
+  wps.forEach((w, i) => {
+    if (i > 0) t += w.travelSec
+    out.push(t)
+    t += w.holdSec
+  })
+  return out
+}
+
+async function dragKeyframe(page: import('@playwright/test').Page, id: string, deltaFrac: number) {
+  const box = await page.locator(`[data-testid="camera-keyframe-${id}"]`).boundingBox()
+  const trackBox = await page.locator('[data-testid="timeline-camera-track"]').boundingBox()
+  if (!box || !trackBox) throw new Error('camera keyframe or track not found')
+  const y = box.y + box.height / 2
+  const startX = box.x + box.width / 2
+  await page.mouse.move(startX, y)
+  await page.mouse.down()
+  await page.mouse.move(startX + trackBox.width * deltaFrac, y, { steps: 6 })
+  await page.mouse.up()
+}
+
+test('camera: dragging a keyframe moves only that waypoint in time; overtaking a neighbor swaps the order', async ({ page }) => {
+  await gotoApp(page)
+  await page.getByRole('radio', { name: 'Kameraflug planen' }).click()
+  await page.locator('canvas.maplibregl-canvas').click({ button: 'right', position: { x: 350, y: 200 } })
+  await expect.poll(() => getCameraWaypoints(page)).toHaveLength(3)
+
+  const before = await getCameraWaypoints(page)
+  const [, arrB0, arrC0] = cameraArrivals(before)
+
+  // First keyframe is the time origin: rendered, but not draggable.
+  await expect(page.locator(`[data-testid="camera-keyframe-${before[0].id}"]`)).toBeVisible()
+
+  // B a little later: C keeps its arrival time, only the legs around B change.
+  await dragKeyframe(page, before[1].id, 0.05)
+  await expect.poll(async () => cameraArrivals(await getCameraWaypoints(page))[1]).toBeGreaterThan(arrB0 + 0.1)
+  const afterMove = await getCameraWaypoints(page)
+  expect(afterMove.map((w) => w.id)).toEqual(before.map((w) => w.id))
+  expect(cameraArrivals(afterMove)[2]).toBeCloseTo(arrC0, 6)
+
+  // C far to the left, past B: order becomes A, C, B.
+  await dragKeyframe(page, before[2].id, -0.6)
+  await expect.poll(async () => (await getCameraWaypoints(page)).map((w) => w.id)).toEqual([before[0].id, before[2].id, before[1].id])
+})
+
 test('marker: dragging the fadeIn edge changes fadeInSec; unchecking hold-forever exposes hold/fadeOut edges too', async ({ page }) => {
   await gotoApp(page)
 

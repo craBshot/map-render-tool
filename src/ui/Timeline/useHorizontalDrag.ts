@@ -20,6 +20,8 @@ export function useHorizontalDrag(
   trackRef: RefObject<HTMLElement | null>,
   onDrag: (fracX: number) => void,
   onDragEnd?: () => void,
+  /** false: fracX may go below 0 / above 1 when the pointer leaves the track (e.g. dragging the last camera keyframe past the current end). */
+  clamp = true,
 ): UseHorizontalDragResult {
   const [dragging, setDragging] = useState(false)
   const widthRef = useRef(0)
@@ -27,8 +29,9 @@ export function useHorizontalDrag(
 
   const fracXFromClientX = useCallback((clientX: number) => {
     if (widthRef.current === 0) return 0
-    return Math.min(1, Math.max(0, (clientX - leftRef.current) / widthRef.current))
-  }, [])
+    const frac = (clientX - leftRef.current) / widthRef.current
+    return clamp ? Math.min(1, Math.max(0, frac)) : frac
+  }, [clamp])
 
   const startDrag = useCallback(
     (e: ReactPointerEvent<HTMLElement>) => {
